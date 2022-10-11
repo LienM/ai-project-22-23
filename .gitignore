@@ -1,5 +1,10 @@
 # Project Specific
 data
+*/data
+*/*/data
+*articles*.csv
+*customers*.csv
+*transactions_train*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

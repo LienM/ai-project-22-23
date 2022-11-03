@@ -17,7 +17,8 @@ def lgbm_ranker_train(train, params):
         boosting_type=params['boosting_type'],
         n_estimators=100,
         importance_type='gain',
-        n_jobs=7,
+        n_jobs=10,
+        # random_state=666
     )
     qids_train = train.groupby(['week', 'customer_id'])['article_id'].count().values
     y_train = train['y']
@@ -25,7 +26,7 @@ def lgbm_ranker_train(train, params):
     model.fit(
         X=X_train,
         y=y_train,
-        group=qids_train,
+        group=qids_train
     )
     # x_train_cols = list(X_train.columns)
     # print(x_train_cols)

@@ -41,7 +41,7 @@ def w2v_articles(articles, verbose=True, vec_size=25, **kwargs):
     return articles
 
 
-def pp_articles(articles, verbose=True, **kwargs):
+def pp_articles(articles, params, verbose=True):
     # reduce memory usage
     articles['article_id'] = pd.to_numeric(articles['article_id'], downcast='integer')
     articles['product_code'] = pd.to_numeric(articles['product_code'], downcast='integer')
@@ -52,7 +52,7 @@ def pp_articles(articles, verbose=True, **kwargs):
     articles['index_group_no'] = pd.to_numeric(articles['index_group_no'], downcast='integer')
     articles['section_no'] = pd.to_numeric(articles['section_no'], downcast='integer')
 
-    articles = w2v_articles(articles, verbose, **kwargs)
+    articles = w2v_articles(articles, verbose, params['w2v_vec_size'])
 
     pn_encoder = LabelEncoder()
     articles['prod_name'] = pn_encoder.fit_transform(articles['prod_name'])
@@ -161,12 +161,12 @@ def pp_transactions(transactions):
     return transactions
 
 
-def pp_data(articles, customers, transactions, force=False, write=True, verbose=True, **kwargs):
+def pp_data(articles, customers, transactions, params, force=False, write=True, verbose=True, ):
     if verbose:
         print("Preprocessing data... ", end='')
     # redo preprocessing if pickle files are missing
     if not os.path.isfile('pickles/articles.pkl') or force:
-        articles = pp_articles(articles, verbose=verbose, **kwargs)
+        articles = pp_articles(articles, verbose=verbose, params=params)
         if write:
             articles.to_pickle('pickles/articles.pkl')
     else:

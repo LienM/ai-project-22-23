@@ -5,7 +5,7 @@ from tqdm import tqdm
 DATA_DIR = '../../data/'
 
 
-def load_data(read_articles=True, read_customers=True, read_transactions=True, frac=1, verbose=True):
+def load_data(read_articles=True, read_customers=True, read_transactions=True, frac=1, seed=42, verbose=True):
     if verbose:
         print("\nLoading articles", end='')
     articles = pd.read_csv(f'{DATA_DIR}articles.csv') if read_articles else None
@@ -20,7 +20,7 @@ def load_data(read_articles=True, read_customers=True, read_transactions=True, f
         transactions = transactions.sort_values(by=['t_dat'])
     if frac < 1 and read_transactions and read_customers and read_articles:
         # sample customers
-        customers = customers.sample(frac=frac)
+        customers = customers.sample(frac=frac, random_state=seed)
         customers.reset_index(drop=True, inplace=True)
         # sample transactions
         transactions = transactions[transactions['customer_id'].isin(customers['customer_id'])]

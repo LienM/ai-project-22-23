@@ -56,17 +56,17 @@ def grid_search(pp_params, t_params, k=3):
     t_combinations = list(ParameterGrid(t_params))
     pp_combinations = list(ParameterGrid(pp_params))
     for i in range(k):
-        og_articles, og_customers, og_transactions = load_data(frac=0.05, verbose=VERBOSE)
-        for pp_combination in pp_combinations:
+        og_articles, og_customers, og_transactions = load_data(frac=0.05, seed=i, verbose=VERBOSE)
+        for pp_combination in tqdm(pp_combinations, desc=f"Preprocessing loop", leave=False):
             print(f"Preprocessing with params: {pp_combination}")
             articles, customers, transactions, cus_keys = pp_data(og_articles.copy(), og_customers.copy(),
                                                                   og_transactions.copy(),
                                                                   force=True, write=False, verbose=VERBOSE,
-                                                                  vector_size=pp_combination['w2v_vector_size'])
+                                                                  params=pp_combination)
             transactions, transactions_val = test_train_split(transactions)
 
             # get all possible combinations of hyperparameters
-            for params in t_combinations:
+            for params in tqdm(t_combinations, desc=f"Training loop", leave=False):
                 print(f"\tTraining with params: {params}\n\t", end='')
                 # train model
                 score = validation_step(articles.copy(), customers.copy(), transactions.copy(), transactions_val.copy(),
@@ -157,7 +157,7 @@ def full_run(pp_params=None, t_params=None):
     articles, customers, transactions = load_data()
     articles, customers, transactions, cus_keys = pp_data(articles, customers, transactions,
                                                           force=True, write=False, verbose=VERBOSE,
-                                                          vector_size=pp_params['w2v_vector_size'])
+                                                          params=pp_params)
     predictions = make_predictions(articles, customers, transactions, params=t_params)
     # replace customer id again
     predictions.rename(columns={'customer_id': 'transformed'}, inplace=True)

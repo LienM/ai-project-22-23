@@ -2,14 +2,16 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
+DATA_DIR = 'data/'
+
 
 def load_data(read_articles=True, read_customers=True, read_transactions=True, frac=1):
     print("\nLoading articles", end='')
-    articles = pd.read_csv('../../data/articles.csv') if read_articles else None
+    articles = pd.read_csv(f'{DATA_DIR}articles.csv') if read_articles else None
     print("\rLoading customers", end='')
-    customers = pd.read_csv('../../data/customers.csv') if read_customers else None
+    customers = pd.read_csv(f'{DATA_DIR}customers.csv') if read_customers else None
     print("\rLoading transactions", end='')
-    transactions = pd.read_csv('../../data/transactions_train.csv') if read_transactions else None
+    transactions = pd.read_csv(f'{DATA_DIR}transactions_train.csv') if read_transactions else None
     if read_transactions:
         transactions['t_dat'] = pd.to_datetime(transactions['t_dat'], format='%Y-%m-%d')
         transactions = transactions.sort_values(by=['t_dat'])
@@ -52,7 +54,13 @@ def write_submission(results, append=False):
     if type(results) == dict:
         results = dict_to_df(results)
 
-    file = '../../data/submission.csv'
+    # check if columns are in correct order
+    if results.columns[0] != 'customer_id':
+        # swap column positions
+        columns_titles = ["customer_id", "prediction"]
+        results = results.reindex(columns=columns_titles)
+
+    file = f'{DATA_DIR}submission.csv'
     if append:
         results.to_csv(file, mode='a', index=False, header=False)
     else:

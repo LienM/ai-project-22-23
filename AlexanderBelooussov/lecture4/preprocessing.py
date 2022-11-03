@@ -50,20 +50,22 @@ def pp_articles(articles):
     articles['index_group_no'] = pd.to_numeric(articles['index_group_no'], downcast='integer')
     articles['section_no'] = pd.to_numeric(articles['section_no'], downcast='integer')
 
-
-
     articles = w2v_articles(articles)
 
     pn_encoder = LabelEncoder()
     articles['prod_name'] = pn_encoder.fit_transform(articles['prod_name'])
 
-    articles.drop(columns=['product_type_name', 'graphical_appearance_name', 'colour_group_name', 'perceived_colour_value_name', 'perceived_colour_master_name', 'department_name', 'index_name', 'index_group_name', 'section_name', 'garment_group_name', 'detail_desc'], inplace=True)
+    articles.drop(
+        columns=['product_type_name', 'graphical_appearance_name', 'colour_group_name', 'perceived_colour_value_name',
+                 'perceived_colour_master_name', 'department_name', 'index_name', 'index_group_name', 'section_name',
+                 'garment_group_name', 'detail_desc'], inplace=True)
 
     gan_encoder = LabelEncoder()
     articles['graphical_appearance_no'] = gan_encoder.fit_transform(articles['graphical_appearance_no']).astype('int8')
 
     pgn_encoder = LabelEncoder()
-    articles['product_group_name'] = pd.to_numeric(pgn_encoder.fit_transform(articles['product_group_name']), downcast='integer')
+    articles['product_group_name'] = pd.to_numeric(pgn_encoder.fit_transform(articles['product_group_name']),
+                                                   downcast='integer')
 
     ic_encoder = LabelEncoder()
     articles['index_code'] = pd.to_numeric(ic_encoder.fit_transform(articles['index_code']), downcast='integer')
@@ -83,7 +85,8 @@ def pp_articles(articles):
 def pp_customers(customers):
     cus_keys = customers.copy()
     cus_keys.drop(columns=[x for x in customers.columns if x != 'customer_id'], inplace=True)
-    cus_keys['transformed'] = customers['customer_id'].swifter.progress_bar(False).apply(lambda x: int(x[-16:], 16)).astype('int64')
+    cus_keys['transformed'] = customers['customer_id'].swifter.progress_bar(False).apply(
+        lambda x: int(x[-16:], 16)).astype('int64')
     customers['customer_id'] = cus_keys['transformed']
     customers['FN'] = customers['FN'].fillna(0)
     customers['Active'] = customers['Active'].fillna(0)
@@ -126,7 +129,6 @@ def pp_transactions(transactions):
     transactions['customer_id'] = transactions['customer_id'].apply(lambda x: int(x[-16:], 16)).astype('int64')
     # print(transactions.info())
 
-
     # add week no from start of data
     start = transactions['t_dat'].min() - pd.Timedelta(
         days=1)  # week starts on wednesday, but first day in data is thursday
@@ -138,13 +140,14 @@ def pp_transactions(transactions):
     # add day of week
     transactions['day_of_week'] = (transactions.t_dat.dt.dayofweek).astype('int8')
     dow_encoder = LabelEncoder()
-    transactions['day_of_week'] = pd.to_numeric(dow_encoder.fit_transform(transactions['day_of_week']), downcast='integer')
+    transactions['day_of_week'] = pd.to_numeric(dow_encoder.fit_transform(transactions['day_of_week']),
+                                                downcast='integer')
 
     # add month
     transactions['month'] = (transactions.t_dat.dt.month).astype('int8')
 
     # add year
-    transactions['year'] = (transactions.t_dat.dt.year-2000).astype('int8')
+    transactions['year'] = (transactions.t_dat.dt.year - 2000).astype('int8')
 
     # add day of month
     transactions['day'] = (transactions.t_dat.dt.day).astype('int8')
@@ -156,26 +159,30 @@ def pp_transactions(transactions):
     return transactions
 
 
-def pp_data(articles, customers, transactions, force=False):
+def pp_data(articles, customers, transactions, force=False, write=True):
     print("Preprocessing data... ", end='')
     # redo preprocessing if pickle files are missing
     if not os.path.isfile('pickles/articles.pkl') or force:
         articles = pp_articles(articles)
-        articles.to_pickle('pickles/articles.pkl')
+        if write:
+            articles.to_pickle('pickles/articles.pkl')
     else:
         articles = pd.read_pickle('pickles/articles.pkl')
 
     if not os.path.isfile('pickles/customers.pkl') or force:
         customers, cus_keys = pp_customers(customers)
-        customers.to_pickle('pickles/customers.pkl')
-        cus_keys.to_pickle('pickles/cus_keys.pkl')
+        if write:
+            customers.to_pickle('pickles/customers.pkl')
+            cus_keys.to_pickle('pickles/cus_keys.pkl')
     else:
         customers = pd.read_pickle('pickles/customers.pkl')
-        cus_keys = pd.read_pickle('pickles/cus_keys.pkl')
+        if write:
+            cus_keys = pd.read_pickle('pickles/cus_keys.pkl')
 
     if not os.path.isfile('pickles/transactions.pkl') or force:
         transactions = pp_transactions(transactions)
-        transactions.to_pickle('pickles/transactions.pkl')
+        if write:
+            transactions.to_pickle('pickles/transactions.pkl')
     else:
         transactions = pd.read_pickle('pickles/transactions.pkl')
 

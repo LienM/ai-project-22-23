@@ -50,10 +50,9 @@ def neg_samples(articles, customers, transactions, purchase_hist, verbose=True, 
     repeats = tqdm(range(n), desc="Generating negative samples", leave=False) if verbose else range(n)
     for i in repeats:
         tmp = customers[['customer_id']].copy()
-        tmp['article_id'] = tmp['customer_id'].swifter.progress_bar(enable=False).apply(
-            lambda x: np.random.choice(transactions['article_id'].values, 1)[0])
-        tmp['week'] = tmp['customer_id'].swifter.progress_bar(enable=False).apply(
-            lambda x: np.random.choice(transactions['week'].values, 1)[0])
+        # sample
+        tmp['article_id'] = np.random.choice(transactions['article_id'], size=tmp.shape[0])
+        tmp['week'] = np.random.choice(transactions['week'], size=tmp.shape[0])
         # remove already purchased articles
         tmp = tmp[~tmp[['customer_id', 'article_id']].isin(purchase_hist[['customer_id', 'article_id']]).all(axis=1)]
         neg = neg.append(tmp)

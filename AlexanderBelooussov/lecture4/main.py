@@ -4,10 +4,12 @@ from candidates import *
 from ranking import *
 from preprocessing import *
 from samples import *
+from multiprocessing import Pool, Semaphore
 
 ### TODO LIST
 # 1. Feature engineering
-# 2. Hyperparameter tuning
+# 2. Improve negative sampling
+# 3. Hyperparameter tuning
 
 default_train_params = {
     'train_period': 999,
@@ -57,7 +59,8 @@ def grid_search(pp_params, t_params, k=3):
         og_articles, og_customers, og_transactions = load_data(frac=0.05, verbose=VERBOSE)
         for pp_combination in pp_combinations:
             print(f"Preprocessing with params: {pp_combination}")
-            articles, customers, transactions, cus_keys = pp_data(og_articles.copy(), og_customers.copy(), og_transactions.copy(),
+            articles, customers, transactions, cus_keys = pp_data(og_articles.copy(), og_customers.copy(),
+                                                                  og_transactions.copy(),
                                                                   force=True, write=False, verbose=VERBOSE,
                                                                   vector_size=pp_combination['w2v_vector_size'])
             transactions, transactions_val = test_train_split(transactions)
@@ -66,7 +69,8 @@ def grid_search(pp_params, t_params, k=3):
             for params in t_combinations:
                 print(f"\tTraining with params: {params}\n\t", end='')
                 # train model
-                score = validation_step(articles.copy(), customers.copy(), transactions.copy(), transactions_val.copy(), params=params)
+                score = validation_step(articles.copy(), customers.copy(), transactions.copy(), transactions_val.copy(),
+                                        params=params)
                 # save results
                 p = dict(params)
                 p.update(pp_combination)
@@ -93,12 +97,12 @@ def validation_step(processed_articles, processed_customers, processed_transacti
     if params is None:
         params = default_train_params
     predictions = make_predictions(processed_articles, processed_customers, processed_transactions, params=params)
-    map12 = map_at_12(predictions, validation)
+    map12 = map_at_12(predictions, validation, verbose=VERBOSE)
     print(f"MAP@12 score: {map12}")
     return map12
 
 
-def make_predictions(processed_articles, processed_customers, processed_transactions, params=None):
+def make_predictions(processed_articles, processed_customers, processed_transactions, verbose=True, params=None):
     if params is None:
         params = default_train_params
     samples = generate_samples(processed_articles, processed_customers, processed_transactions,
@@ -115,18 +119,30 @@ def make_predictions(processed_articles, processed_customers, processed_transact
     processed_transactions.drop(columns=['t_dat'], inplace=True)
 
     predictions = {}
+    if verbose:
+        print("Training model...", end='')
     model = lgbm_ranker_train(samples, params=params)
-    # candidates = tqdm(candidates, desc='Predicting', leave=False) if VERBOSE else candidates
-    for key in tqdm(candidates, desc='Predicting', leave=False) if VERBOSE else candidates:
-        prediction = lgbm_ranker_predict(
-            model,
-            get_data_from_canditates(candidates[key], key, processed_articles, processed_customers,
-                                     processed_transactions)
-        )
-        predictions[key] = prediction
+    if verbose:
+        print("\r", end='')
+
+    # generate predictions using multiprocessing
+    with Pool(10) as p:
+        for cid, prediction in p.starmap(task, [
+            (model, candidates[cid], cid, processed_articles, processed_customers, processed_transactions) for cid in
+                processed_customers['customer_id'].values]):
+            predictions[cid] = prediction
     predictions = dict_to_df(predictions)
 
     return predictions
+
+
+def task(model, candidates, cid, articles, customers, transactions):
+    prediction = lgbm_ranker_predict(
+        model,
+        get_data_from_canditates(candidates, cid, articles, customers,
+                                 transactions)
+    )
+    return cid, prediction
 
 
 def full_run(pp_params=None, t_params=None):
@@ -156,4 +172,3 @@ if __name__ == '__main__':
 
     # train on full data set
     # full_run(best_pp_params, best_train_params)
-

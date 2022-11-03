@@ -38,7 +38,7 @@ def pos_samples(articles, customers, transactions, period=999):
     return pos
 
 
-def neg_samples(articles, customers, transactions, purchase_hist, period=999):
+def neg_samples(articles, customers, transactions, purchase_hist, verbose=True, period=999):
     max_date = transactions['t_dat'].max()
     min_date = max_date - pd.Timedelta(weeks=period)
     # generate random articles and weeks for each customer
@@ -46,20 +46,17 @@ def neg_samples(articles, customers, transactions, purchase_hist, period=999):
     # repeat average number of purchases per customer
     n = int(purchase_hist.shape[0] / customers.shape[0])
     neg = pd.DataFrame()
-    transactions = transactions[transactions['t_dat'] > transactions['t_dat'].max() - pd.Timedelta(days=period)]
-    for i in tqdm(range(n), desc="Generating negative samples", leave=False):
+    transactions = transactions[transactions['t_dat'] > min_date]
+    repeats = tqdm(range(n), desc="Generating negative samples", leave=False) if verbose else range(n)
+    for i in repeats:
         tmp = customers[['customer_id']].copy()
         tmp['article_id'] = tmp['customer_id'].swifter.progress_bar(enable=False).apply(
-            lambda x: np.random.choice(articles['article_id'].values, 1)[0])
+            lambda x: np.random.choice(transactions['article_id'].values, 1)[0])
         tmp['week'] = tmp['customer_id'].swifter.progress_bar(enable=False).apply(
-            lambda x: np.random.choice(transactions[transactions['t_dat'] > min_date]['week'].values, 1)[0])
+            lambda x: np.random.choice(transactions['week'].values, 1)[0])
         # remove already purchased articles
         tmp = tmp[~tmp[['customer_id', 'article_id']].isin(purchase_hist[['customer_id', 'article_id']]).all(axis=1)]
         neg = neg.append(tmp)
-
-    # join with articles and customers
-    # neg = neg.merge(customers, on='customer_id', how='left')
-    # neg = neg.merge(articles, on='article_id', how='left')
 
     neg['y'] = 0
 
@@ -67,12 +64,13 @@ def neg_samples(articles, customers, transactions, purchase_hist, period=999):
     return neg
 
 
-def generate_samples(articles, customers, transactions, force, write=True, **kwargs):
-    print(f"Generating samples...", end="")
+def generate_samples(articles, customers, transactions, force, write=True, verbose=True, **kwargs):
+    if verbose:
+        print(f"Generating samples...", end="")
     if not os.path.exists('pickles/samples.pkl') or force:
         # resample if pickle file is not found
         samples = pos_samples(articles, customers, transactions, **kwargs)
-        neg = neg_samples(articles, customers, transactions, samples, **kwargs)
+        neg = neg_samples(articles, customers, transactions, samples, verbose, **kwargs)
         # append positive and negative samples
         samples = samples.append(neg)
         # shuffle
@@ -86,5 +84,6 @@ def generate_samples(articles, customers, transactions, force, write=True, **kwa
         samples = pd.read_pickle('pickles/samples.pkl')
 
     # print(samples.head(50))
-    print("\r", end="")
+    if verbose:
+        print("\r", end="")
     return samples

@@ -2,15 +2,18 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-DATA_DIR = 'data/'
+DATA_DIR = '../../data/'
 
 
-def load_data(read_articles=True, read_customers=True, read_transactions=True, frac=1):
-    print("\nLoading articles", end='')
+def load_data(read_articles=True, read_customers=True, read_transactions=True, frac=1, verbose=True):
+    if verbose:
+        print("\nLoading articles", end='')
     articles = pd.read_csv(f'{DATA_DIR}articles.csv') if read_articles else None
-    print("\rLoading customers", end='')
+    if verbose:
+        print("\rLoading customers", end='')
     customers = pd.read_csv(f'{DATA_DIR}customers.csv') if read_customers else None
-    print("\rLoading transactions", end='')
+    if verbose:
+        print("\rLoading transactions", end='')
     transactions = pd.read_csv(f'{DATA_DIR}transactions_train.csv') if read_transactions else None
     if read_transactions:
         transactions['t_dat'] = pd.to_datetime(transactions['t_dat'], format='%Y-%m-%d')
@@ -25,7 +28,8 @@ def load_data(read_articles=True, read_customers=True, read_transactions=True, f
         # sample articles
         articles = articles[articles['article_id'].isin(transactions['article_id'])]
         articles.reset_index(drop=True, inplace=True)
-    print("\r", end='')
+    if verbose:
+        print("\r", end='')
     return articles, customers, transactions
 
 
@@ -49,8 +53,9 @@ def dict_to_df(d, to_string=True):
     return df
 
 
-def write_submission(results, append=False):
-    print("Writing submission", end='')
+def write_submission(results, append=False, verbose=True):
+    if verbose:
+        print("Writing submission", end='')
     if type(results) == dict:
         results = dict_to_df(results)
 
@@ -65,14 +70,15 @@ def write_submission(results, append=False):
         results.to_csv(file, mode='a', index=False, header=False)
     else:
         results.to_csv(file, index=False, header=True)
-    print("\r", end='')
+    if verbose:
+        print("\r", end='')
 
 
-def map_at_12(predictions: pd.DataFrame, ground_truth: pd.DataFrame):
+def map_at_12(predictions: pd.DataFrame, ground_truth: pd.DataFrame, verbose=True):
     predictions = predictions.set_index(['customer_id'])
     aps = []
     gt_dict = ground_truth.to_dict('records')
-    pbar = tqdm(gt_dict, leave=False)
+    pbar = tqdm(gt_dict, leave=False) if verbose else gt_dict
     pred_dict = predictions.to_dict('index')
     for row in pbar:
         pred_row = pred_dict[row['customer_id']]
@@ -92,5 +98,6 @@ def map_at_12(predictions: pd.DataFrame, ground_truth: pd.DataFrame):
             if i == 11:
                 break
         aps.append(ap / min(len(gt), 12))
-        pbar.set_description(f"Evaluating using MAP@12: {np.mean(aps)}")
+        if verbose:
+            pbar.set_description(f"Evaluating using MAP@12: {np.mean(aps)}")
     return np.mean(aps)

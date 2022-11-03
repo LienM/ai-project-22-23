@@ -10,11 +10,11 @@ def random_ranker(candidates, articles, customers, transactions):
     return result
 
 
-def lgbm_ranker_train(train):
+def lgbm_ranker_train(train, params):
     model = LGBMRanker(
         objective="lambdarank",
-        metric="ndcg",
-        boosting_type="dart",
+        metric=params['metric'],
+        boosting_type=params['boosting_type'],
         n_estimators=100,
         importance_type='gain',
         n_jobs=7,

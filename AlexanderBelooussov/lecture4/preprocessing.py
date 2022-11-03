@@ -9,8 +9,9 @@ import swifter
 import pickle
 
 
-def w2v_articles(articles, vec_size=25):
-    print(f"Generating word2vec encoding for articles", end="")
+def w2v_articles(articles, verbose=True, vec_size=25, **kwargs):
+    if verbose:
+        print(f"Generating word2vec encoding for articles", end="")
 
     # setup training set for word2vec
     train_frame = articles[
@@ -35,11 +36,12 @@ def w2v_articles(articles, vec_size=25):
     articles[[f"w2v_{i}" for i in range(vec_size)]] = pd.DataFrame(articles['w2v'].tolist(), index=articles.index)
     articles.drop(columns=['w2v'], inplace=True)
 
-    print(f"\rPreprocessing data... ", end="")
+    if verbose:
+        print(f"\rPreprocessing data... ", end="")
     return articles
 
 
-def pp_articles(articles):
+def pp_articles(articles, verbose=True, **kwargs):
     # reduce memory usage
     articles['article_id'] = pd.to_numeric(articles['article_id'], downcast='integer')
     articles['product_code'] = pd.to_numeric(articles['product_code'], downcast='integer')
@@ -50,7 +52,7 @@ def pp_articles(articles):
     articles['index_group_no'] = pd.to_numeric(articles['index_group_no'], downcast='integer')
     articles['section_no'] = pd.to_numeric(articles['section_no'], downcast='integer')
 
-    articles = w2v_articles(articles)
+    articles = w2v_articles(articles, verbose, **kwargs)
 
     pn_encoder = LabelEncoder()
     articles['prod_name'] = pn_encoder.fit_transform(articles['prod_name'])
@@ -159,11 +161,12 @@ def pp_transactions(transactions):
     return transactions
 
 
-def pp_data(articles, customers, transactions, force=False, write=True):
-    print("Preprocessing data... ", end='')
+def pp_data(articles, customers, transactions, force=False, write=True, verbose=True, **kwargs):
+    if verbose:
+        print("Preprocessing data... ", end='')
     # redo preprocessing if pickle files are missing
     if not os.path.isfile('pickles/articles.pkl') or force:
-        articles = pp_articles(articles)
+        articles = pp_articles(articles, verbose=verbose, **kwargs)
         if write:
             articles.to_pickle('pickles/articles.pkl')
     else:
@@ -176,8 +179,7 @@ def pp_data(articles, customers, transactions, force=False, write=True):
             cus_keys.to_pickle('pickles/cus_keys.pkl')
     else:
         customers = pd.read_pickle('pickles/customers.pkl')
-        if write:
-            cus_keys = pd.read_pickle('pickles/cus_keys.pkl')
+        cus_keys = pd.read_pickle('pickles/cus_keys.pkl')
 
     if not os.path.isfile('pickles/transactions.pkl') or force:
         transactions = pp_transactions(transactions)
@@ -186,5 +188,6 @@ def pp_data(articles, customers, transactions, force=False, write=True):
     else:
         transactions = pd.read_pickle('pickles/transactions.pkl')
 
-    print("\r", end='')
+    if verbose:
+        print("\r", end='')
     return articles, customers, transactions, cus_keys

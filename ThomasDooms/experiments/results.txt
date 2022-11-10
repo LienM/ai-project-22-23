@@ -1,0 +1,8 @@
+csv: 79.5 seconds
+parquet: 0.766 seconds
+
+csv size: 3.4 GB
+parquet size: 207 MB
+
+memory usage without preprocessing: 6.3 GB
+memory usage with preprocessing: 606.3 MB

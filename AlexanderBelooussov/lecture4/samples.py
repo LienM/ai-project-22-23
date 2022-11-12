@@ -221,9 +221,9 @@ def samples(data, n_train_weeks=12, n=12):
     samples.sort_values(['week', 'customer_id'], inplace=True)
     samples.reset_index(drop=True, inplace=True)
     data['samples'] = samples
-    print(samples.head(200).sort_values(by=['article_id', 'week'], inplace=False))
-    print(f"Samples shape: {samples.shape}")
-    print(samples[samples.week == test_week].head(200).sort_values(by=['article_id', 'week'], inplace=False))
+    # print(samples.head(200).sort_values(by=['article_id', 'week'], inplace=False))
+    # print(f"Samples shape: {samples.shape}")
+    # print(samples[samples.week == test_week].head(200).sort_values(by=['article_id', 'week'], inplace=False))
     # raise Exception('stop')
     data['test_week'] = test_week
     data['article_week_info'] = previous_week_info

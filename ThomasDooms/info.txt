@@ -1,0 +1,6 @@
+start: 2018-09-20 00:00:00
+end: 2020-09-22 00:00:00
+
+cv / lb
+16 dims prod_name, 16 dims desc, 8 dims dep_name, colour_group_name
+0.306 - 0.01715

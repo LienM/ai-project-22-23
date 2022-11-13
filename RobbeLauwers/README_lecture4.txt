@@ -1,0 +1,3 @@
+I used the notebooks from https://github.com/radekosmulski/personalized_fashion_recs as starting point.
+lecture4_part1.ipynb is used to preprocess and store data. If subsequent notebooks can't find certain data, run this notebook again with different parameters in the first code cell.
+The second notebook lecture4_part2.ipynb saves data to ../data/subs/{submissionname}. The submission name is printed at the end of the notebook, but you might have to create the subs directory manually.

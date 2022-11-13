@@ -11,7 +11,7 @@ def rank(data):
     """
     test_week = data['test_week']
     samples = data['samples']
-    train = samples[samples.week != test_week]
+    train = samples[samples.week != test_week].sort_values(by=['week', 'customer_id'])
     test = samples[samples.week == test_week].drop_duplicates(['customer_id', 'article_id', 'sales_channel_id']).copy()
     train_baskets = train.groupby(['week', 'customer_id'])['article_id'].count().values
     columns_to_use = train.columns.difference(['customer_id', 'week', 'purchased', 'day_of_week', 'month', 'year', 'day'])

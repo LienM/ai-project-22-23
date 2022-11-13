@@ -8,6 +8,8 @@ from rank import *
 from lightgbm.sklearn import LGBMRanker
 import argparse
 
+import warnings
+warnings.filterwarnings("ignore")
 
 def main(
         n_train_weeks=12,
@@ -33,7 +35,7 @@ def main(
     data_dict = pp_data(data_dict, force=True, write=False, verbose=verbose, params=pp_params)
 
     # generate samples and candidates
-    data_dict = samples(data_dict, n_train_weeks=12, n=12)
+    data_dict = samples(data_dict, n_train_weeks=n_train_weeks, n=n)
 
     # train model and make predictions
     predictions = rank(data_dict)
@@ -56,11 +58,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_train_week', type=int, default=12)
     parser.add_argument('--n', type=int, default=12)
-    parser.add_argument('--frac', type=float, default=0.1)
+    parser.add_argument('--frac', type=float, default=0.05)
     parser.add_argument('--cv', type=bool, default=True)
     parser.add_argument('--verbose', type=bool, default=False)
 
     args = parser.parse_args()
+
+    # some tests for the slides :)
+    for n in [12, 25, 50]:
+        for n_train_weeks in [12, 26, 52]:
+            try:
+                print(f"n: {n}, n_train_weeks: {n_train_weeks}")
+                main(n_train_weeks=n_train_weeks, n=n, frac=args.frac, cv=True, verbose=False)
+            except:
+                print("Failed")
     main(
         n_train_weeks=args.n_train_week,
         n=args.n,

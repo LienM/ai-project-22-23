@@ -80,15 +80,26 @@ def split_test_train(data, test_week):
 
 
 def train_model(train_x, train_y, groups):
-    ranker = LGBMRanker(
-        objective="lambdarank",
-        metric="ndcg",
-        boosting_type="dart",
-        n_estimators=100,
-        importance_type="gain",
-        force_row_wise=True,
-        verbose=10,
-    )
+    rand = 64
+    params = {
+        "objective": "binary",
+        "boosting": "gbdt",
+        "max_depth": -1,
+        "num_leaves": 40,
+        "subsample": 0.8,
+        "subsample_freq": 1,
+        "bagging_seed": rand,
+        "learning_rate": 0.05,
+        "feature_fraction": 0.6,
+        "min_data_in_leaf": 100,
+        "lambda_l1": 0,
+        "lambda_l2": 0,
+        "random_state": rand,
+        "metric": "auc",
+        "verbose": -1
+    }
+
+    ranker = LGBMRanker(**params)
 
     ranker = ranker.fit(
         train_x,

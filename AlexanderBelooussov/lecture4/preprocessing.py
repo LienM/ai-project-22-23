@@ -9,7 +9,17 @@ import swifter
 import pickle
 
 
-def w2v_articles(articles, verbose=True, vec_size=25, **kwargs):
+def w2v_articles(articles, verbose=True, vec_size=25):
+    """
+    Creates word2vec embeddings for the prod_name column
+    :param articles:
+    :param verbose:
+    :param vec_size:
+    :return:
+    """
+    if vec_size < 1:
+        return articles
+
     if verbose:
         print(f"Generating word2vec encoding for articles", end="")
 
@@ -41,7 +51,15 @@ def w2v_articles(articles, verbose=True, vec_size=25, **kwargs):
     return articles
 
 
-def pp_articles(articles, params, verbose=True):
+def pp_articles(articles, transactions, params, verbose=True):
+    """
+    Preprocesses the articles data
+    :param articles:
+    :param transactions:
+    :param params:
+    :param verbose:
+    :return:
+    """
     # reduce memory usage
     articles['article_id'] = pd.to_numeric(articles['article_id'], downcast='integer')
     articles['product_code'] = pd.to_numeric(articles['product_code'], downcast='integer')
@@ -52,7 +70,7 @@ def pp_articles(articles, params, verbose=True):
     articles['index_group_no'] = pd.to_numeric(articles['index_group_no'], downcast='integer')
     articles['section_no'] = pd.to_numeric(articles['section_no'], downcast='integer')
 
-    articles = w2v_articles(articles, verbose, params['w2v_vec_size'])
+    articles = w2v_articles(articles, verbose, params['w2v_vector_size'])
 
     pn_encoder = LabelEncoder()
     articles['prod_name'] = pn_encoder.fit_transform(articles['prod_name'])
@@ -84,11 +102,28 @@ def pp_articles(articles, params, verbose=True):
     return articles
 
 
-def pp_customers(customers):
+def customer_id_transform(df, target_row):
+    """
+    Helper function that transforms the customer_id column into integers
+    :param df:
+    :param target_row: Name of the target row, string
+    :return: Modified dataframe
+    """
+    df[target_row] = df['customer_id'].swifter.progress_bar(False).apply(
+        lambda x: int(x[-16:], 16)).astype('int64')
+    return df
+
+
+def pp_customers(customers, transactions):
+    """
+    Preprocesses the customers data
+    :param customers:
+    :param transactions:
+    :return:
+    """
     cus_keys = customers.copy()
     cus_keys.drop(columns=[x for x in customers.columns if x != 'customer_id'], inplace=True)
-    cus_keys['transformed'] = customers['customer_id'].swifter.progress_bar(False).apply(
-        lambda x: int(x[-16:], 16)).astype('int64')
+    cus_keys = customer_id_transform(cus_keys, 'transformed')
     customers['customer_id'] = cus_keys['transformed']
     customers['FN'] = customers['FN'].fillna(0)
     customers['Active'] = customers['Active'].fillna(0)
@@ -125,6 +160,11 @@ def pp_customers(customers):
 
 
 def pp_transactions(transactions):
+    """
+    Preprocesses the transactions data
+    :param transactions:
+    :return:
+    """
     # reduce memory usage
     transactions['article_id'] = pd.to_numeric(transactions['article_id'], downcast='integer')
     transactions['sales_channel_id'] = pd.to_numeric(transactions['sales_channel_id'], downcast='integer')
@@ -155,39 +195,56 @@ def pp_transactions(transactions):
     transactions['day'] = (transactions.t_dat.dt.day).astype('int8')
 
     # remove t_dat
-    # transactions.drop(columns=['t_dat'], inplace=True)
+    transactions.drop(columns=['t_dat'], inplace=True)
 
     # print(transactions.head(20))
     return transactions
 
 
-def pp_data(articles, customers, transactions, params, force=False, write=True, verbose=True, ):
+def pp_data(data, params, force=False, write=True, verbose=True):
+    """
+    Preprocesses all data
+    :param data:
+    :param params:
+    :param force:
+    :param write:
+    :param verbose:
+    :return:
+    """
+    articles = data['articles']
+    customers = data['customers']
+    transactions = data['transactions']
     if verbose:
         print("Preprocessing data... ", end='')
     # redo preprocessing if pickle files are missing
-    if not os.path.isfile('pickles/articles.pkl') or force:
-        articles = pp_articles(articles, verbose=verbose, params=params)
+    if not os.path.isfile('pickles/articles.feather') or force:
+        articles = pp_articles(articles, transactions, verbose=verbose, params=params)
         if write:
-            articles.to_pickle('pickles/articles.pkl')
+            articles.to_feather('pickles/articles.feather')
     else:
-        articles = pd.read_pickle('pickles/articles.pkl')
+        articles = pd.read_feather('pickles/articles.feather')
 
     if not os.path.isfile('pickles/customers.pkl') or force:
-        customers, cus_keys = pp_customers(customers)
+        customers, cus_keys = pp_customers(customers, transactions)
         if write:
-            customers.to_pickle('pickles/customers.pkl')
-            cus_keys.to_pickle('pickles/cus_keys.pkl')
+            customers.to_feather('pickles/customers.feather')
+            cus_keys.to_feather('pickles/cus_keys.feather')
     else:
-        customers = pd.read_pickle('pickles/customers.pkl')
-        cus_keys = pd.read_pickle('pickles/cus_keys.pkl')
+        customers = pd.read_feather('pickles/customers.feather')
+        cus_keys = pd.read_feather('pickles/cus_keys.feather')
 
-    if not os.path.isfile('pickles/transactions.pkl') or force:
+    if not os.path.isfile('pickles/transactions.feather') or force:
         transactions = pp_transactions(transactions)
         if write:
-            transactions.to_pickle('pickles/transactions.pkl')
+            transactions.to_feather('pickles/transactions.feather')
     else:
-        transactions = pd.read_pickle('pickles/transactions.pkl')
+        transactions = pd.read_feather('pickles/transactions.feather')
 
     if verbose:
         print("\r", end='')
-    return articles, customers, transactions, cus_keys
+
+    data['articles'] = articles
+    data['customers'] = customers
+    data['transactions'] = transactions
+    data['customer_keys'] = cus_keys
+    return data

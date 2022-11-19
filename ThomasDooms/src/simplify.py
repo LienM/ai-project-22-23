@@ -4,27 +4,14 @@
 # @copyright   : MA2 Computer Science - Thomas Dooms - University of Antwerp
 # ============================================================================
 
-import time
 import pandas as pd
-
-# =================================================================================================
-# Be careful!
-# Using these techniques is really handy, but you need to convert article_id and customer_id back
-# The code can be found here
-# https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/discussion/308635
-# ==================================================================================================
-
-BASE = 'data'
+from paths import path
 
 
 def customer_id_to_int(x): return int(x[-16:], 16)
 
 
-def simplify_transactions():
-    print("starting transaction simplifying")
-    start = time.time()
-
-    transactions = pd.read_csv(f'{BASE}/transactions.csv')
+def simplify_transactions(transactions):
     transactions.info(memory_usage='deep')
 
     transactions['customer_id'] = transactions['customer_id'].apply(customer_id_to_int).astype('int32')
@@ -44,15 +31,9 @@ def simplify_transactions():
     transactions['sales_channel_id'] = transactions['sales_channel_id'].astype('int8')
 
     transactions.info(memory_usage='deep')
-    transactions.to_feather(f'{BASE}/transactions.feather')
-    print(f"done simplifying transactions in {time.time() - start:.2f} seconds\n\n")
 
 
-def simplify_customers():
-    print("starting customer simplifying")
-    start = time.time()
-
-    customers = pd.read_csv(f'{BASE}/customers.csv')
+def simplify_customers(customers):
     customers.info(memory_usage='deep')
 
     # FN / Active are mapped to i8 with values 0 and 1
@@ -63,19 +44,17 @@ def simplify_customers():
     customers["Active"] = customers["Active"].astype('int8')
     customers["club_member_status"] = pd.factorize(customers["club_member_status"])[0].astype('int8')
     customers["fashion_news_frequency"] = pd.factorize(customers["fashion_news_frequency"])[0].astype('int8')
-    customers['customer_id'] = customers['customer_id'].apply(customer_id_to_int).astype('int64')
+    customers['customer_id'] = customers['customer_id'].apply(customer_id_to_int).astype('int32')
     customers['postal_code'] = pd.factorize(customers['postal_code'])[0].astype('int32')
 
+    # Take the mean of the customer's age, there aren't many so this doesn't really matter
+    customers['age'].fillna(customers['age'].mean(), inplace=True)
+    customers['age'] = customers["age"].astype('int8')
+
     customers.info(memory_usage='deep')
-    customers.to_feather(f'{BASE}/customers.feather')
-    print(f"done simplifying customers in {time.time() - start:.2f} seconds\n\n")
 
 
-def simplify_articles():
-    print("starting article simplifying")
-    start = time.time()
-
-    articles = pd.read_csv(f'{BASE}/articles.csv')
+def simplify_articles(articles):
     articles.info(memory_usage='deep')
 
     # Everything that has weird indices, is factorized, similar to label encoding
@@ -92,22 +71,31 @@ def simplify_articles():
 
     # This only retains ['prod_name', 'detail_desc', 'product_type_name'] as string values.
     # This is what I've found to be the only useful string columns to embed but your mileage may vary.
-    articles.drop(["graphical_appearance_name", "colour_group_name", "perceived_colour_value_name",
-                   "perceived_colour_master_name", "department_name", "index_name", "index_group_name", "section_name",
-                   "garment_group_name"], axis=1, inplace=True)
+    articles.drop(["graphical_appearance_name", "perceived_colour_value_name", "perceived_colour_master_name",
+                   "index_name", "index_group_name", "section_name", "garment_group_name"], axis=1, inplace=True)
 
     articles.info(memory_usage='deep')
-    articles.to_feather(f'{BASE}/articles.feather')
-    print(f"done simplifying articles in {time.time() - start:.2f} seconds\n\n")
 
 
-def simplify_submission():
-    submission = pd.read_csv(f'{BASE}/submission.csv')
-    submission.to_feather(f'{BASE}/submission.feather')
+def simplify_full():
+    # datasets = ["transactions", "customers", "articles"]
+    datasets = ["articles"]
+
+    for dataset in datasets:
+        data = pd.read_csv(path(dataset, 'original'))
+        globals()[f"simplify_{dataset}"](data)
+        data.to_feather(path(dataset, 'full'))
+
+
+def simplify_sample(frac=0.0001):
+    # datasets = ["transactions", "customers", "articles"]
+    datasets = ["articles"]
+
+    for dataset in datasets:
+        data = pd.read_feather(path(dataset, 'full'))
+        data.sample(frac=frac).reset_index(drop=True).to_feather(path(dataset, 'sample'))
 
 
 if __name__ == '__main__':
-    simplify_articles()
-    # simplify_customers()
-    # simplify_transactions()
-    # simplify_submission()
+    simplify_full()
+    # simplify_sample()

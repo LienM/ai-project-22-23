@@ -1,4 +1,5 @@
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 
@@ -8,6 +9,7 @@ from BasilRommens.cleaning import clean_articles, clean_customers, \
 
 def create_samples(articles, customers, transactions, samples):
     # Adapted from: https://www.kaggle.com/code/paweljankiewicz/hm-create-dataset-samples
+    # taken from 2nd notebook
     # This extracts three sampled datasets, containing 0.1%, 1% and 5% of all users and their transactions, and the associated articles.
     for sample_repr, sample in samples:
         customers_sample = customers.sample(int(customers.shape[0] * sample),
@@ -60,6 +62,8 @@ def prepare_feather_datasets():
         customers['customer_id'])
     transactions['customer_id'] = customer_encoder.transform(
         transactions['customer_id'])
+    customers['customer_id'].astype(np.uint32)
+    transactions['customer_id'].astype(np.uint32)
 
     create_samples(articles, customers, transactions,
                    [("01", 0.001), ("1", 0.01), ("5", 0.05)])

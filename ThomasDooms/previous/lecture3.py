@@ -7,7 +7,7 @@ pd.options.display.max_columns = None
 pd.options.display.width = None
 pd.options.display.max_rows = None
 
-articles = pd.read_csv("data/articles.csv")
+articles = pd.read_csv("../data/articles/articles.csv")
 # customers = pd.read_csv("data/customers.csv")
 # transactions = pd.read_csv("data/transactions.csv")
 

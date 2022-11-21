@@ -84,7 +84,7 @@ def train_model(train_x, train_y, groups):
         objective="lambdarank",
         metric="ndcg",
         boosting_type="dart",
-        n_estimators=100,
+        n_estimators=10,
         importance_type="gain",
         force_row_wise=True,
         verbose=10,
@@ -102,20 +102,18 @@ def train_model(train_x, train_y, groups):
 def main():
     random.seed(42)
 
-    size = "all"
     recreate = False
     cv = False
 
-    transactions = pd.read_feather(f"data/transactions_{size}.feather")
-    articles = pd.read_feather("data/articles.feather")
-    customers = pd.read_feather("data/customers.feather")
+    transactions = pd.read_feather(f"data/transactions/features.feather")
+    articles = pd.read_feather("data/articles/features.feather")
+    customers = pd.read_feather("data/customers/features.feather")
 
     max_week = transactions.week.max()
     test_week = max_week + int(not cv)  # increase by 1 if not using cross-validation
     transactions = transactions[transactions["week"] > max_week - 10 - cv]
 
-    path = f"data/samples_{size}.feather"
-    if recreate or not os.path.exists(path):
+    if recreate or not os.path.exists(f"data/candidates/full.feather"):
         print("Creating new samples")
         last_purchases = last_purchase_candidates(transactions, test_week)
         bestsellers, previous_bestsellers = bestseller_candidates(transactions, test_week)
@@ -136,24 +134,26 @@ def main():
         )
 
         data.reset_index(drop=True, inplace=True)
-        data.to_feather(path)
+        data.to_feather(f"data/candidates/full.feather")
         print(f"Done generating samples {data.size}")
     else:
-        data = pd.read_feather(path)
+        data = pd.read_feather(f"data/candidates/full.feather")
         print(f"Using existing samples {data.size}")
+
+    # data["bestseller_rank"].fillna(999, inplace=True)
 
     data = pd.merge(data, articles, on="article_id", how="left")
     data = pd.merge(data, customers, on="customer_id", how="left")
 
     train, test, groups = split_test_train(data, test_week)
 
-    columns = ["article_id", "product_type_no", "graphical_appearance_no", "colour_group_code",
+    columns = ["product_type_no", "graphical_appearance_no", "colour_group_code",
                "perceived_colour_value_id", "perceived_colour_master_id", "department_no", "index_code",
                "index_group_no", "section_no", "garment_group_no", "FN", "Active", "club_member_status",
-               "fashion_news_frequency", "age", "postal_code", "bestseller_rank"]
+               "fashion_news_frequency", "age", "postal_code", "rank"]
 
-    columns += [f"prod_name_{i}" for i in range(16)]
-    columns += [f"detail_desc_{i}" for i in range(16)]
+    columns += [f"prod_name_{i}" for i in range(8)]
+    columns += [f"detail_desc_{i}" for i in range(8)]
 
     ranker = train_model(train[columns], train["purchased"], groups)
 
@@ -164,7 +164,7 @@ def main():
     test.sort_values(["customer_id", "prediction"], ascending=False, inplace=True)
     predicted = test.groupby("customer_id")["article_id"].apply(list).to_dict()
 
-    submission = pd.read_feather("data/example.feather")
+    submission = pd.read_feather("data/submission/full.feather")
 
     baseline = transactions[transactions["week"] == test_week - 1]["article_id"].value_counts().head(12).index.tolist()
 
@@ -179,7 +179,7 @@ def main():
     submission.drop(columns=["c_id_mapped"], inplace=True)
     submission["prediction"] = submission["prediction"].apply(lambda val: " ".join(f"0{x}" for x in val))
 
-    submission.to_csv("submission.csv", index=False)
+    submission.to_csv("submission.csv.gz", index=False, compression="gzip")
 
 
 if __name__ == "__main__":

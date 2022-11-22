@@ -134,12 +134,16 @@ def get_similarity_samples(data, transactions, n, sim_type, unique_transactions,
         i = int((w - transactions.week.min()) / (transactions.week.max() + 1 - transactions.week.min()) * n)
         i = max(1, i)
         transactions_w = transactions[transactions.week < w]
-        sim_matrix, article_map, sim_sam = get_similar_items(data['articles'], transactions_w, i, sim_type, last_week_customers_only=True)
+        sim_matrix, article_map, sim_sam = get_similar_items(data['articles'],
+                                                             transactions_w,
+                                                             i,
+                                                             sim_type,
+                                                             last_week_customers_only=True)
         sim_sam['week'] = w
         sim_sam = merge_downcast(customers_to_use, sim_sam, on=['week', 'customer_id'])
         samples = concat_downcast([samples, sim_sam])
 
     samples = merge_downcast(samples,
-                                previous_week_info[['week', 'article_id', 'price']],
-                                on=['week', 'article_id'], how='left')
+                             previous_week_info[['week', 'article_id', 'price']],
+                             on=['week', 'article_id'], how='left')
     return sim_matrix, article_map, samples

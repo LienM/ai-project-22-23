@@ -111,15 +111,13 @@ def add_recpack_score(samples, transactions):
         algo.fit(interaction_matrix)
         predictions = algo.predict(interaction_matrix)
 
-        samples['recpack_score'] = samples.loc[samples.week == w][['customer_id', 'article_id']].\
+        samples['recpack_score'] = samples.loc[samples.week == w][['customer_id', 'article_id']]. \
             progress_apply(
-            lambda x: predictions[customer_map[x[0]], article_map[x[1]]] if x[0] in customer_map and x[1] in article_map else float(0),
+            lambda x: predictions[customer_map[x[0]], article_map[x[1]]] if x[0] in customer_map and x[
+                1] in article_map else float(0),
             axis=1, raw=True)
         break
     return samples
-
-
-
 
 
 if __name__ == '__main__':
@@ -128,4 +126,3 @@ if __name__ == '__main__':
     transactions = data['transactions']
     data['transactions'] = transactions[transactions['week'] > transactions['week'].max() - 12]
     recpack_cv(data)
-

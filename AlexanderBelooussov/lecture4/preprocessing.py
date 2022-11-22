@@ -106,7 +106,7 @@ def customer_id_transform(df, target_row):
     :param target_row: Name of the target row, string
     :return: Modified dataframe
     """
-    df[target_row] = df['customer_id'].swifter.progress_bar(False).apply(lambda x: int(x[-8:],  16)).astype('int32')
+    df[target_row] = df['customer_id'].swifter.progress_bar(False).apply(lambda x: int(x[-8:], 16)).astype('int32')
     return df
 
 

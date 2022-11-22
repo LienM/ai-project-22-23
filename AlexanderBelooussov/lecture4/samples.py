@@ -37,7 +37,8 @@ def previous_week_article_info(data):
     article_week_info = merge_downcast(article_week_info, previous_week_rank, on=['week', 'article_id'], how='left')
     article_week_info.bestseller_rank.fillna(article_week_info.bestseller_rank.max() + 100, inplace=True)
     article_week_info['bestseller_rank'] = pd.to_numeric(article_week_info['bestseller_rank'], downcast='integer')
-    article_week_info["price"] = article_week_info.groupby("article_id")["price"].transform(lambda x: x.fillna(x.mean()))
+    article_week_info["price"] = article_week_info.groupby("article_id")["price"].transform(
+        lambda x: x.fillna(x.mean()))
 
     # =====sales in last week=====
     weekly_sales = transactions \
@@ -159,7 +160,8 @@ def samples(data, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=None):
         if verbose:
             print(f"Generating samples with RecPack")
         # some initial recpack candidates
-        for w in tqdm(range(transactions.week.min() + 1, transactions.week.max() + 2), desc=f"Recpack samples per week"):
+        for w in tqdm(range(transactions.week.min() + 1, transactions.week.max() + 2),
+                      desc=f"Recpack samples per week"):
             i = int((w - transactions.week.min()) / (transactions.week.max() + 1 - transactions.week.min()) * n)
             i = max(1, i)
             customers_to_use = unique_transactions if w < transactions.week.max() + 1 else test_set_transactions
@@ -183,7 +185,8 @@ def samples(data, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=None):
     if 'w2v' in methods: types.append('w2v')
     if 'l0' in methods: types.append('l0')
     for sim_type in types:
-        sim_matrix, article_map, candidates = get_similarity_samples(data, transactions, n, sim_type, unique_transactions, test_set_transactions)
+        sim_matrix, article_map, candidates = get_similarity_samples(data, transactions, n, sim_type,
+                                                                     unique_transactions, test_set_transactions)
         data[f'{sim_type}_similarity'] = sim_matrix
         data[f'{sim_type}_similarity_index'] = article_map
 
@@ -218,7 +221,7 @@ def samples(data, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=None):
         samples = concat_downcast([train, candidates])
 
     # print some statistics about our samples
-    p_mean = n_pos_samples/ (n_pos_samples + n_neg_samples)
+    p_mean = n_pos_samples / (n_pos_samples + n_neg_samples)
     n_candidates = samples.loc[samples['week'] == test_week].shape[0]
     print(f"REMAINING RATIO OF POSITIVE SAMPLES: {p_mean * 100:.2f}%, {1}:{(1 - p_mean) / p_mean:.2f}")
     print(f"REMAINING #CANDIDATES: {n_candidates}, #SAMPLES: {n_pos_samples + n_neg_samples}")
@@ -240,10 +243,12 @@ def samples(data, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=None):
     if 'itemkknn' in methods:
         samples = add_recpack_score(samples, transactions)
     if 'w2v' in methods:
-        samples['w2v_sim'] = add_similarity(samples, data['purchase_history'], data['w2v_similarity'], data['w2v_similarity_index'])
+        samples['w2v_sim'] = add_similarity(samples, data['purchase_history'], data['w2v_similarity'],
+                                            data['w2v_similarity_index'])
         del data['w2v_similarity'], data['w2v_similarity_index']
     if 'l0' in methods:
-        samples['l0_sim'] = add_similarity(samples, data['purchase_history'], data['l0_similarity'], data['l0_similarity_index'])
+        samples['l0_sim'] = add_similarity(samples, data['purchase_history'], data['l0_similarity'],
+                                           data['l0_similarity_index'])
         del data['l0_similarity'], data['l0_similarity_index']
 
     # merge but ignore w2v_i columns

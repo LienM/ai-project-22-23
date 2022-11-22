@@ -8,8 +8,8 @@ from functools import partialmethod
 from rank import *
 from samples import *
 
-
 warnings.filterwarnings("ignore")
+
 
 def main(
         n_train_weeks=12,
@@ -27,7 +27,8 @@ def main(
     if itemknn: methods.append('itemknn')
     if l0: methods.append('l0')
     if w2v: methods.append('w2v')
-    print(f"Running with: frac={frac}, n={n}, n_train_weeks={n_train_weeks}, ratio={ratio}, cv={cv}, verbose={verbose}, methods={methods}")
+    print(
+        f"Running with: frac={frac}, n={n}, n_train_weeks={n_train_weeks}, ratio={ratio}, cv={cv}, verbose={verbose}, methods={methods}")
 
     if pp_params is None:
         pp_params = {'w2v_vector_size': 25}

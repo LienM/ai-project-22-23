@@ -17,9 +17,9 @@ def rank(data, verbose=True):
 
     test = samples[samples.week == test_week].drop_duplicates(['customer_id', 'article_id', 'sales_channel_id']).copy()
     train_baskets = train.groupby(['week', 'customer_id'])['article_id'].count().values
-    columns_to_use = train.columns.difference(['customer_id', 'week', 'purchased', 'day_of_week', 'month', 'year', 'day'])
+    columns_to_use = train.columns.difference(
+        ['customer_id', 'week', 'purchased', 'day_of_week', 'month', 'year', 'day'])
     train_x = train[columns_to_use]
-
 
     train_y = train['purchased']
 
@@ -40,7 +40,7 @@ def rank(data, verbose=True):
         group=train_baskets
     )
     for i in ranker.feature_importances_.argsort()[::-1]:
-        print(columns_to_use[i], ranker.feature_importances_[i]/ranker.feature_importances_.sum())
+        print(columns_to_use[i], ranker.feature_importances_[i] / ranker.feature_importances_.sum())
 
     test['preds'] = ranker.predict(test_x)
     # print(test['preds'].describe())
@@ -50,10 +50,11 @@ def rank(data, verbose=True):
         .sort_values(['customer_id', 'preds'], ascending=False) \
         .groupby('customer_id')['article_id'].apply(list).to_dict()
 
-    bestsellers_previous_week = data['article_week_info'][['article_id', 'week', 'bestseller_rank']].sort_values(by=['week', 'bestseller_rank'])
+    bestsellers_previous_week = data['article_week_info'][['article_id', 'week', 'bestseller_rank']].sort_values(
+        by=['week', 'bestseller_rank'])
     bestsellers_last_week = \
         bestsellers_previous_week[bestsellers_previous_week.week == bestsellers_previous_week.week.max()]['article_id'] \
-        .tolist()
+            .tolist()
 
     customers = data['customers']
     preds = []

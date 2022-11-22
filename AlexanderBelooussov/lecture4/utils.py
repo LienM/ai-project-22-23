@@ -10,7 +10,8 @@ DATA_DIR = os.environ.get('DATA_DIR', '../../data/')
 
 
 def get_max_date(data):
-    max_row = data.sort_values(by=['year', 'month', 'day'], inplace=True, ascending=False).head(1)[['year', 'month', 'day']]
+    max_row = data.sort_values(by=['year', 'month', 'day'], inplace=True, ascending=False).head(1)[
+        ['year', 'month', 'day']]
     year = max_row['year'].values[0]
     month = max_row['month'].values[0]
     day = max_row['day'].values[0]
@@ -177,6 +178,7 @@ def merge_downcast(df1, df2, **kwargs):
         print(f"Downcasting failed")
         return df
 
+
 def concat_downcast(dfs, **kwargs):
     # for df in dfs[1:]:
     #     assert df.shape[0] > 0, "Empty dataframe"
@@ -190,7 +192,8 @@ def concat_downcast(dfs, **kwargs):
 
 
 def make_purchase_history(transactions):
-    m = transactions.drop_duplicates(['customer_id', 'article_id']).groupby(['customer_id', 'week'])['article_id'].apply(list).reset_index(name='last_week')
+    m = transactions.drop_duplicates(['customer_id', 'article_id']).groupby(['customer_id', 'week'])[
+        'article_id'].apply(list).reset_index(name='last_week')
     m = m.sort_values(['customer_id', 'week']).reset_index(drop=True)
     m['week'] += 1
     # append previous weeks
@@ -214,7 +217,8 @@ def add_similarity(samples, purchase_hist, sim, sim_index):
     print(f"Adding similarity to samples...")
     purchase_hist = purchase_hist.set_index(['customer_id', 'week'])
     # turn items of purchase history into indices
-    purchase_hist['purchase_history'] = purchase_hist['purchase_history'].apply(lambda x: [sim_index[item] for item in x])
+    purchase_hist['purchase_history'] = purchase_hist['purchase_history'].apply(
+        lambda x: [sim_index[item] for item in x])
     hist = purchase_hist.to_dict("index")
     min_week = samples.week.min()
 
@@ -236,8 +240,6 @@ def add_similarity(samples, purchase_hist, sim, sim_index):
     #     print(e)
     tqdm.pandas()
     s = samples[['customer_id', 'article_id', 'week']].progress_apply(lambda x: get_sim(x), axis=1,
-                                                                                   raw=True)
+                                                                      raw=True)
 
     return s
-
-

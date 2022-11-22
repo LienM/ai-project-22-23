@@ -2,7 +2,7 @@ import pandas as pd
 from lightgbm.sklearn import LGBMRanker
 
 
-def rank(data):
+def rank(data, verbose=True):
     """
     Create train and test sets for LightGBM Ranker
     Train LightGBM model and make predictions
@@ -11,11 +11,16 @@ def rank(data):
     """
     test_week = data['test_week']
     samples = data['samples']
-    train = samples[samples.week != test_week].sort_values(by=['week', 'customer_id'])
+    train = samples[samples.week != test_week].sort_values(by=['week', 'customer_id']).reset_index(drop=True)
+    # reduce amount of negative samples
+    if verbose: print(train.info())
+
     test = samples[samples.week == test_week].drop_duplicates(['customer_id', 'article_id', 'sales_channel_id']).copy()
     train_baskets = train.groupby(['week', 'customer_id'])['article_id'].count().values
-    columns_to_use = train.columns.difference(['customer_id', 'week', 'purchased', 'day_of_week', 'month', 'year', 'day'])
+    columns_to_use = train.columns.difference(
+        ['customer_id', 'week', 'purchased', 'day_of_week', 'month', 'year', 'day'])
     train_x = train[columns_to_use]
+
     train_y = train['purchased']
 
     test_x = test[columns_to_use]
@@ -26,7 +31,7 @@ def rank(data):
         boosting_type="dart",
         n_estimators=100,
         importance_type='gain',
-        verbose=10
+        verbose=10 if verbose else 1
     )
 
     ranker = ranker.fit(
@@ -35,7 +40,7 @@ def rank(data):
         group=train_baskets
     )
     for i in ranker.feature_importances_.argsort()[::-1]:
-        print(columns_to_use[i], ranker.feature_importances_[i]/ranker.feature_importances_.sum())
+        print(columns_to_use[i], ranker.feature_importances_[i] / ranker.feature_importances_.sum())
 
     test['preds'] = ranker.predict(test_x)
     # print(test['preds'].describe())
@@ -45,14 +50,11 @@ def rank(data):
         .sort_values(['customer_id', 'preds'], ascending=False) \
         .groupby('customer_id')['article_id'].apply(list).to_dict()
 
-    # for i, key in enumerate(c_id2predicted_article_ids.keys()):
-    #     if i > 5: break
-    #     print(key, c_id2predicted_article_ids[key])
-
-    bestsellers_previous_week = data['article_week_info'][['article_id', 'week', 'bestseller_rank']]
+    bestsellers_previous_week = data['article_week_info'][['article_id', 'week', 'bestseller_rank']].sort_values(
+        by=['week', 'bestseller_rank'])
     bestsellers_last_week = \
         bestsellers_previous_week[bestsellers_previous_week.week == bestsellers_previous_week.week.max()]['article_id'] \
-        .tolist()
+            .tolist()
 
     customers = data['customers']
     preds = []

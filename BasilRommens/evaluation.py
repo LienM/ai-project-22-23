@@ -24,7 +24,6 @@ def map_at_k(rel_items, users, n, k):
             sum_k += precision(rel_items, user[1], l) + relevance(rel_items,
                                                                   user[1],
                                                                   l)
-
         sum_U += sum_k
     return sum_U / (len(users))
 

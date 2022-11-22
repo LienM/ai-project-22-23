@@ -1,9 +1,12 @@
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
 import os
 
-DATA_DIR = '../../data/'
+import numpy as np
+import pandas as pd
+import pdcast as pdc
+from tqdm import tqdm
+
+# get from environment variable
+DATA_DIR = os.environ.get('DATA_DIR', '../../data/')
 
 
 def get_max_date(data):
@@ -138,16 +141,17 @@ def map_at_12(predictions: pd.DataFrame, ground_truth: pd.DataFrame, verbose=Tru
 
 
 def candidates_recall_test(data, ground_truth: pd.DataFrame, count_missing=True, verbose=True):
+    # get candidates
     samples = data['samples']
     test_week = data['test_week']
     test = samples[samples.week == test_week].drop_duplicates(
-        ['customer_id', 'article_id', 'sales_channel_id'])
+        ['customer_id', 'article_id'])
+    candidates = test.groupby('customer_id')['article_id'].apply(list).reset_index()
 
     recalls = []
     gt_dict = ground_truth.to_dict('records')
     pbar = tqdm(gt_dict, leave=False) if verbose else gt_dict
     # group articles by customer
-    candidates = test.groupby('customer_id')['article_id'].apply(list).reset_index()
     for row in pbar:
         customer_id = row['customer_id']
         if customer_id not in candidates['customer_id'].values:
@@ -162,4 +166,78 @@ def candidates_recall_test(data, ground_truth: pd.DataFrame, count_missing=True,
             pbar.set_description(f"Evaluating recall")
 
     return np.mean(recalls)
+
+
+def merge_downcast(df1, df2, **kwargs):
+    df = pd.merge(df1, df2, **kwargs)
+    try:
+        dcdf = pdc.downcast(df)
+        return dcdf
+    except:
+        print(f"Downcasting failed")
+        return df
+
+def concat_downcast(dfs, **kwargs):
+    # for df in dfs[1:]:
+    #     assert df.shape[0] > 0, "Empty dataframe"
+    df = pd.concat(dfs, **kwargs)
+    try:
+        dcdf = pdc.downcast(df)
+        return dcdf
+    except:
+        print(f"Downcasting failed")
+        return df
+
+
+def make_purchase_history(transactions):
+    m = transactions.drop_duplicates(['customer_id', 'article_id']).groupby(['customer_id', 'week'])['article_id'].apply(list).reset_index(name='last_week')
+    m = m.sort_values(['customer_id', 'week']).reset_index(drop=True)
+    m['week'] += 1
+    # append previous weeks
+    m['purchase_history'] = m.groupby('customer_id')['last_week'].apply(lambda x: x.cumsum())
+    m = m.drop('last_week', axis=1)
+    # downcast
+    m = pdc.downcast(m)
+    return m[['customer_id', 'week', 'purchase_history']]
+
+
+def add_similarity(samples, purchase_hist, sim, sim_index):
+    """
+    Add similarity to samples
+    Pretty slow but oh well
+    :param samples:
+    :param purchase_hist:
+    :param sim:
+    :param sim_index:
+    :return:
+    """
+    print(f"Adding similarity to samples...")
+    purchase_hist = purchase_hist.set_index(['customer_id', 'week'])
+    # turn items of purchase history into indices
+    purchase_hist['purchase_history'] = purchase_hist['purchase_history'].apply(lambda x: [sim_index[item] for item in x])
+    hist = purchase_hist.to_dict("index")
+    min_week = samples.week.min()
+
+    def get_sim(row):
+        article_idx = sim_index[row[1]]
+        key = (row[0], row[2])
+        while key not in hist:
+            if key[1] < min_week:
+                return float(0)
+            key = (key[0], key[1] - 1)
+        return sim[article_idx, hist[key]['purchase_history']].mean()
+
+    # try:
+    #     s = samples[['customer_id', 'article_id', 'week']]. \
+    #         swifter.progress_bar(enable=True, desc=f"Calculating similarity"). \
+    #         apply(lambda x: get_sim(x), axis=1, raw=True)
+    # except Exception as e:
+    #     print(f"Swifter failed")
+    #     print(e)
+    tqdm.pandas()
+    s = samples[['customer_id', 'article_id', 'week']].progress_apply(lambda x: get_sim(x), axis=1,
+                                                                                   raw=True)
+
+    return s
+
 

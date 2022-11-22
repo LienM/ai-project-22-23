@@ -1,7 +1,5 @@
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
 from recpack_samples import *
+from similarity import get_similarity_samples
 
 pd.options.display.max_columns = None
 pd.options.display.max_rows = None
@@ -34,12 +32,12 @@ def previous_week_article_info(data):
         .groupby('week').rank(method='min', ascending=False) \
         .rename('bestseller_rank').astype('int16')
 
-    previous_week_rank = pd.merge(weekly_sales_rank, mean_price, on=['week', 'article_id']).reset_index()
+    previous_week_rank = merge_downcast(weekly_sales_rank, mean_price, on=['week', 'article_id']).reset_index()
     # previous_week_rank.week += 1
-    article_week_info = pd.merge(article_week_info, previous_week_rank, on=['week', 'article_id'], how='left')
-    article_week_info.bestseller_rank.fillna(9999, inplace=True)
+    article_week_info = merge_downcast(article_week_info, previous_week_rank, on=['week', 'article_id'], how='left')
+    article_week_info.bestseller_rank.fillna(article_week_info.bestseller_rank.max() + 100, inplace=True)
     article_week_info['bestseller_rank'] = pd.to_numeric(article_week_info['bestseller_rank'], downcast='integer')
-    article_week_info.price.fillna(-1, inplace=True)
+    article_week_info["price"] = article_week_info.groupby("article_id")["price"].transform(lambda x: x.fillna(x.mean()))
 
     # =====sales in last week=====
     weekly_sales = transactions \
@@ -50,6 +48,7 @@ def previous_week_article_info(data):
     article_week_info = pd.merge(article_week_info, weekly_sales, on=['week', 'article_id'], how='left')
     article_week_info['1w_sales'].fillna(0, inplace=True)
     article_week_info['1w_sales'] = pd.to_numeric(article_week_info['1w_sales'], downcast='integer')
+    article_week_info = pdc.downcast(article_week_info)
 
     # =====sales in last 4 weeks=====
     article_week_info['4w_sales'] = article_week_info.groupby('article_id')['1w_sales'].rolling(4,
@@ -73,7 +72,7 @@ def previous_week_article_info(data):
     return article_week_info
 
 
-def samples(data, n_train_weeks=12, n=12):
+def samples(data, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=None):
     """
     Generate samples (positive, negative, candidates)
     :param data:
@@ -81,8 +80,9 @@ def samples(data, n_train_weeks=12, n=12):
     :param n: Number of samples per method, higher = higher recall
     :return:
     """
+    if methods is None:
+        methods = ['itemknn', 'w2v', 'l0']
     bestseller_types = ['bestseller_rank', 'bestseller_4w', 'bestseller_all']
-    # bestseller_types = ['bestseller_rank']
 
     # ========================================================
     # limit scope to train weeks
@@ -94,7 +94,10 @@ def samples(data, n_train_weeks=12, n=12):
     # ========================================================
     # gather info about previous weeks
     previous_week_info = previous_week_article_info(data)
+    data['article_week_info'] = previous_week_info
+    data['purchase_history'] = make_purchase_history(data['transactions'])
 
+    # ========================================================
     # repurchasing
     c2weeks = transactions.groupby('customer_id')['week'].unique()
     c2weeks2shifted_weeks = {}
@@ -111,17 +114,7 @@ def samples(data, n_train_weeks=12, n=12):
         weeks.append(c2weeks2shifted_weeks[c_id][week])
 
     candidates_last_purchase.week = weeks
-
-    # mean_price = transactions \
-    #     .groupby(['week', 'article_id'])['price'].mean()
-    #
-    # sales = transactions \
-    #     .groupby('week')['article_id'].value_counts() \
-    #     .groupby('week').rank(method='dense', ascending=False) \
-    #     .groupby('week').head(12).rename('bestseller_rank').astype('int16')
-    #
-    # bestsellers_previous_week = pd.merge(sales, mean_price, on=['week', 'article_id']).reset_index()
-    # bestsellers_previous_week.week += 1
+    # ========================================================
 
     # get all customers that made a purchase and the week of their last purchase
     unique_transactions = transactions \
@@ -140,61 +133,98 @@ def samples(data, n_train_weeks=12, n=12):
             [['week', 'article_id', 'bestseller_rank', 'price']].sort_values(['week', 'bestseller_rank'])
 
         # join popular items and customers + purchase weeks
-        candidates_bestsellers = pd.merge(
+        candidates_bestsellers = merge_downcast(
             unique_transactions,
             bestsellers_previous_week,
             on='week',
         )
+        # candidates_bestsellers = pdc.downcast(candidates_bestsellers)
 
         # join popular items and customers
-        candidates_bestsellers_test_week = pd.merge(
+        candidates_bestsellers_test_week = merge_downcast(
             test_set_transactions,
             bestsellers_previous_week,
             on='week'
         )
-        bestseller_candidates = pd.concat([bestseller_candidates,
-                                           candidates_bestsellers,
-                                           candidates_bestsellers_test_week])
+        # candidates_bestsellers_test_week = pdc.downcast(candidates_bestsellers_test_week)
+        bestseller_candidates = concat_downcast([bestseller_candidates,
+                                                 candidates_bestsellers,
+                                                 candidates_bestsellers_test_week])
     # drop rank, to be added later
     bestseller_candidates.drop(columns='bestseller_rank', inplace=True)
 
-    # some initial recpack candidates
-    # TODO also do for negative samples
-    recpack = recpack_samples(transactions, n)
-    recpack['week'] = test_week
-    recpack_candidates = pd.merge(
-        test_set_transactions,
-        recpack,
-        on=['week', 'customer_id']
-    )
-    # add price
-    recpack_candidates = recpack_candidates.merge(previous_week_info[['week', 'article_id', 'price']], on=['week', 'article_id'], how='left')
+    # ========================================================
+    recpack_candidates = pd.DataFrame()
+    if 'itemknn' in methods:
+        if verbose:
+            print(f"Generating samples with RecPack")
+        # some initial recpack candidates
+        for w in tqdm(range(transactions.week.min() + 1, transactions.week.max() + 2), desc=f"Recpack samples per week"):
+            i = int((w - transactions.week.min()) / (transactions.week.max() + 1 - transactions.week.min()) * n)
+            i = max(1, i)
+            customers_to_use = unique_transactions if w < transactions.week.max() + 1 else test_set_transactions
+            transactions_w = transactions[transactions.week < w]
+            recpack = get_recpack_samples(transactions_w, i)
+            recpack['week'] = w
+            recpack_samples = pd.merge(
+                customers_to_use,
+                recpack,
+                on=['week', 'customer_id']
+            )
+            recpack_candidates = concat_downcast([recpack_candidates, recpack_samples])
 
-    # ===================================================================================================
+        # add price
+        recpack_candidates = merge_downcast(recpack_candidates, previous_week_info[['week', 'article_id', 'price']],
+                                            on=['week', 'article_id'], how='left')
+    # ========================================================
+    # similarity candidates
+    similarity_candidates = pd.DataFrame()
+    types = []
+    if 'w2v' in methods: types.append('w2v')
+    if 'l0' in methods: types.append('l0')
+    for sim_type in types:
+        sim_matrix, article_map, candidates = get_similarity_samples(data, transactions, n, sim_type, unique_transactions, test_set_transactions)
+        data[f'{sim_type}_similarity'] = sim_matrix
+        data[f'{sim_type}_similarity_index'] = article_map
+
+        similarity_candidates = concat_downcast([similarity_candidates, candidates])
+    # ========================================================
     # set purchased for positive samples
     transactions['purchased'] = 1
     # combine transactions and candidates
-    samples = pd.concat([transactions,
-                         candidates_last_purchase,
-                         bestseller_candidates,
-                         recpack_candidates
-                         ])
+    samples = concat_downcast([transactions,
+                               candidates_last_purchase,
+                               bestseller_candidates,
+                               recpack_candidates,
+                               similarity_candidates
+                               ])
     # set purchased to 0 for candidates and negative samples
     samples.purchased.fillna(0, inplace=True)
+    samples.purchased = samples.purchased.astype(np.int8)
     # only keep the first occurrence of a customer-week-article combination
     # this will keep bought articles since they are concatenated first
     samples.drop_duplicates(['customer_id', 'article_id', 'week'], inplace=True)
 
+    # remove some training samples to match the ratio of positive to negative samples
+    train = samples[samples.week != test_week].sort_values(by=['week', 'customer_id']).reset_index(drop=True)
+    candidates = samples[samples.week == test_week].sort_values(by=['week', 'customer_id']).reset_index(drop=True)
+    pos_samples = train[train.purchased == 1]
+    n_pos_samples = pos_samples.shape[0]
+    neg_samples = train[train.purchased == 0]
+    n_neg_samples = min(int(n_pos_samples * ratio), neg_samples.shape[0])
+    if n_neg_samples < neg_samples.shape[0]:
+        neg_sample = train[train.purchased == 0].sample(n=n_neg_samples, random_state=42)
+        train = concat_downcast([pos_samples, neg_sample])
+        samples = concat_downcast([train, candidates])
+
     # print some statistics about our samples
-    p_sum = samples[samples['week'] != test_week].purchased.sum()
-    p_mean = samples[samples['week'] != test_week].purchased.mean()
-    p_neg = samples[samples['week'] != test_week].purchased.value_counts()[0]
-    n_candidates = samples[samples['week'] == test_week].shape[0]
-    print(f"RATIO OF POSITIVE SAMPLES: {p_mean * 100:.2f}%, {1}:{p_neg / p_sum:.2f}")
-    print(f"#CANDIDATES: {n_candidates}")
+    p_mean = n_pos_samples/ (n_pos_samples + n_neg_samples)
+    n_candidates = samples.loc[samples['week'] == test_week].shape[0]
+    print(f"REMAINING RATIO OF POSITIVE SAMPLES: {p_mean * 100:.2f}%, {1}:{(1 - p_mean) / p_mean:.2f}")
+    print(f"REMAINING #CANDIDATES: {n_candidates}, #SAMPLES: {n_pos_samples + n_neg_samples}")
 
     # add info about sales in previous weeks
-    samples = pd.merge(
+    samples = merge_downcast(
         samples,
         previous_week_info[['week', 'article_id',
                             'bestseller_rank', 'bestseller_4w', 'bestseller_all',
@@ -202,29 +232,35 @@ def samples(data, n_train_weeks=12, n=12):
         on=['week', 'article_id'],
         how='left'
     )
+    # ========================================================
     # finalise samples
     samples = samples[samples.week != samples.week.min()]  # remove first week due to lack of information
-    samples = pd.merge(samples, data['articles'], on='article_id', how='left')  # merge article info
-    samples = pd.merge(samples, data['customers'], on='customer_id', how='left')  # merge customer info
 
-    # fix dtypes
-    samples['week'] = pd.to_numeric(samples['week'], downcast='integer')
-    samples['bestseller_rank'] = pd.to_numeric(samples['bestseller_rank'], downcast='integer')
-    samples['bestseller_4w'] = pd.to_numeric(samples['bestseller_4w'], downcast='integer')
-    samples['bestseller_all'] = pd.to_numeric(samples['bestseller_all'], downcast='integer')
-    samples['1w_sales'] = pd.to_numeric(samples['1w_sales'], downcast='integer')
-    samples['4w_sales'] = pd.to_numeric(samples['4w_sales'], downcast='integer')
-    samples['all_sales'] = pd.to_numeric(samples['all_sales'], downcast='integer')
-    samples['purchased'] = pd.to_numeric(samples['purchased'], downcast='integer')
-    samples['price'] = pd.to_numeric(samples['price'], downcast='float')
+    # add info about w2v similarity
+    if 'itemkknn' in methods:
+        samples = add_recpack_score(samples, transactions)
+    if 'w2v' in methods:
+        samples['w2v_sim'] = add_similarity(samples, data['purchase_history'], data['w2v_similarity'], data['w2v_similarity_index'])
+        del data['w2v_similarity'], data['w2v_similarity_index']
+    if 'l0' in methods:
+        samples['l0_sim'] = add_similarity(samples, data['purchase_history'], data['l0_similarity'], data['l0_similarity_index'])
+        del data['l0_similarity'], data['l0_similarity_index']
+
+    # merge but ignore w2v_i columns
+    columns = [c for c in data['articles'].columns if 'w2v' not in c]
+    samples = merge_downcast(samples, data['articles'][columns], on='article_id', how='left')  # merge article info
+    samples = merge_downcast(samples, data['customers'], on='customer_id', how='left')  # merge customer info
+
+    if verbose: print(samples.info())
 
     samples.sort_values(['week', 'customer_id'], inplace=True)
     samples.reset_index(drop=True, inplace=True)
     data['samples'] = samples
-    # print(samples.head(200).sort_values(by=['article_id', 'week'], inplace=False))
-    # print(f"Samples shape: {samples.shape}")
-    # print(samples[samples.week == test_week].head(200).sort_values(by=['article_id', 'week'], inplace=False))
-    # raise Exception('stop')
+    if verbose:
+        print(samples.head(200).sort_values(by=['article_id', 'week'], inplace=False))
+        print(f"Samples shape: {samples.shape}")
+        print(samples[samples.week == test_week].head(200).sort_values(by=['article_id', 'week'], inplace=False))
+
     data['test_week'] = test_week
-    data['article_week_info'] = previous_week_info
+
     return data

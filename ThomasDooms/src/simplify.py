@@ -78,8 +78,8 @@ def simplify_articles(articles):
 
 
 def simplify_full():
-    # datasets = ["transactions", "customers", "articles"]
-    datasets = ["articles"]
+    datasets = ["transactions", "customers", "articles"]
+    # datasets = ["articles"]
 
     for dataset in datasets:
         data = pd.read_csv(path(dataset, 'original'))
@@ -88,8 +88,8 @@ def simplify_full():
 
 
 def simplify_sample(frac=0.0001):
-    # datasets = ["transactions", "customers", "articles"]
-    datasets = ["articles"]
+    datasets = ["transactions", "customers", "articles"]
+    # datasets = ["articles"]
 
     for dataset in datasets:
         data = pd.read_feather(path(dataset, 'full'))
@@ -98,4 +98,4 @@ def simplify_sample(frac=0.0001):
 
 if __name__ == '__main__':
     simplify_full()
-    # simplify_sample()
+    simplify_sample()

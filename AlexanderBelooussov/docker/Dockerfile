@@ -15,15 +15,20 @@ RUN apt-get update && \
     tqdm \
     lightgbm \
     gensim \
-    torch==1.9.0+cu102 torchvision==0.10.0+cu102 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html \
+    torch==1.9.0+cpu torchvision==0.10.0+cpu torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html \
     pyarrow \
+    pandas-downcast \
     recpack && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN mkdir /offlinerl
-RUN mkdir /offlinerl/data
-WORKDIR /offlinerl
+RUN mkdir /projectai
+RUN mkdir /projectai/data
+WORKDIR /projectai
 
-COPY . /offlinerl/
-RUN mkdir /offlinerl/pickles
+COPY data /projectai/data
+COPY lecture4 /projectai/
+
+ENV DATA_DIR=/projectai/data/
+
+CMD ["python3", "main.py", "--frac", "1", "--cv", "--n", "12", "--n_train_weeks", "12", "--verbose", "--ratio", "30"]

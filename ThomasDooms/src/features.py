@@ -43,21 +43,24 @@ def articles_features(articles, df, name_components=8, description_components=8)
 
     # calculate the amount of times an article is bought per season
     fall = df[df["season"] == 0].groupby("article_id").size().reset_index(name="fall")
-    winter = df[df["season"] == 1].groupby("article_id").size().reset_index(name="winter")
-    spring = df[df["season"] == 2].groupby("article_id").size().reset_index(name="spring")
-    summer = df[df["season"] == 3].groupby("article_id").size().reset_index(name="summer")
+    # winter = df[df["season"] == 1].groupby("article_id").size().reset_index(name="winter")
+    # spring = df[df["season"] == 2].groupby("article_id").size().reset_index(name="spring")
+    # summer = df[df["season"] == 3].groupby("article_id").size().reset_index(name="summer")
 
     articles = pd.merge(articles, fall, on="article_id", how="left")
-    articles = pd.merge(articles, winter, on="article_id", how="left")
-    articles = pd.merge(articles, spring, on="article_id", how="left")
-    articles = pd.merge(articles, summer, on="article_id", how="left")
+    # articles = pd.merge(articles, winter, on="article_id", how="left")
+    # articles = pd.merge(articles, spring, on="article_id", how="left")
+    # articles = pd.merge(articles, summer, on="article_id", how="left")
 
-    seasons = ["fall", "winter", "spring", "summer"]
+    articles["fall"] = articles["fall"].fillna(0).astype('int32')
+    articles["fall"] /= articles["fall"].max()
 
-    articles[seasons] = articles[seasons].fillna(0).astype('int32')
-    articles["season_var"] = articles[seasons].max(axis=1)
-    articles["season_var"] /= articles[seasons].sum(axis=1)
-    articles["season_var"] = articles["season_var"].astype('float32')
+    # seasons = ["fall", "winter", "spring", "summer"]
+
+    # articles[seasons] = articles[seasons].fillna(0).astype('int32')
+    # articles["season_var"] = articles[seasons].max(axis=1)
+    # articles["season_var"] /= articles[seasons].sum(axis=1)
+    # articles["season_var"] = articles["season_var"].astype('float32')
 
     articles.info(memory_usage='deep')
     return articles
@@ -65,6 +68,7 @@ def articles_features(articles, df, name_components=8, description_components=8)
 
 def transactions_features(df):
     counts = df.groupby('week')['article_id'].value_counts().rank(pct=True).reset_index(name='rank')
+    counts["week"] += 1
     df = pd.merge(df, counts, on=['week', 'article_id'], how='left')
     df["rank"] = df["rank"].astype('float32')
 

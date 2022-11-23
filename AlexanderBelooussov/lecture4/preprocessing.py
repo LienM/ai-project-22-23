@@ -1,12 +1,9 @@
 import os
 
-from sklearn.preprocessing import LabelEncoder
-from gensim.models import Word2Vec
 import pandas as pd
-import numpy as np
-import tqdm
+from gensim.models import Word2Vec
+from sklearn.preprocessing import LabelEncoder
 import swifter
-import pickle
 
 
 def w2v_articles(articles, verbose=True, vec_size=25):
@@ -109,8 +106,7 @@ def customer_id_transform(df, target_row):
     :param target_row: Name of the target row, string
     :return: Modified dataframe
     """
-    df[target_row] = df['customer_id'].swifter.progress_bar(False).apply(
-        lambda x: int(x[-16:], 16)).astype('int64')
+    df[target_row] = df['customer_id'].swifter.progress_bar(False).apply(lambda x: int(x[-8:], 16)).astype('int32')
     return df
 
 
@@ -168,7 +164,7 @@ def pp_transactions(transactions):
     # reduce memory usage
     transactions['article_id'] = pd.to_numeric(transactions['article_id'], downcast='integer')
     transactions['sales_channel_id'] = pd.to_numeric(transactions['sales_channel_id'], downcast='integer')
-    transactions['customer_id'] = transactions['customer_id'].apply(lambda x: int(x[-16:], 16)).astype('int64')
+    transactions['customer_id'] = transactions['customer_id'].apply(lambda x: int(x[-8:], 16)).astype('int32')
     # print(transactions.info())
 
     # add week no from start of data

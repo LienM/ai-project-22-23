@@ -334,12 +334,15 @@ if __name__ == "__main__":
     if PARAM["SELECT"]:
         candidates = candidates_selection(transactions, articles, customers, samples)
 
+    # save generated candidates
+    if PARAM["SAVE"]:
+        save_candidates(candidates)
+
     # load candidates from file
     if PARAM["LOAD"]:
         candidates = load_candidates()
 
-    if PARAM["SAVE"]:
-        save_candidates(candidates)
+
 
     # rank candidates and calculate precision
     # popular_items = recent_sales_k_months(transactions, articles, 6)

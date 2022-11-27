@@ -79,11 +79,11 @@ test = test.drop_duplicates(["customer_id", "article_id", "sales_channel_id"]).c
 print(train["postal_code"].value_counts())
 
 # Set all the columns we use to train and test
-cols = ["sales_channel_id", "FN", "Active", "index_code"]
+cols = ["article_id", "sales_channel_id", "FN", "Active", "index_code"]
 cols += ["perceived_colour_master_id", "graphical_appearance_no", "colour_group_code", "perceived_colour_value_id"]
 cols += ["product_type_no", "department_no", "index_group_no", "section_no"]
-cols += ["garment_group_no", "club_member_status", "fashion_news_frequency"]
-cols += ["age", "rank", "dep_colour_0", "dep_colour_1", "fall", "winter", "spring", "summer", "season_var", "season"]
+cols += ["garment_group_no", "club_member_status", "fashion_news_frequency", "age"]
+cols += ["fall", "rank", "dep_colour_0", "dep_colour_1"]
 cols += [f"prod_name_{i}" for i in range(8)]
 cols += [f"detail_desc_{i}" for i in range(8)]
 

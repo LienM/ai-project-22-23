@@ -100,7 +100,58 @@ def extract_all_but_last_week_sales(samples, ordered=True):
     last_week_sales = dated_transactions.loc[dated_transactions["transaction_age_weeks"] >= 1]
     return last_week_sales.drop(columns=["transaction_age_weeks"])
 
+
+def scrape_materials():
+    import requests
+    import requests
+    from bs4 import BeautifulSoup
+    import random
+
+    response = requests.get(
+        url="https://en.wikipedia.org/wiki/List_of_fabrics",
+    )
+    soup = BeautifulSoup(response.content, 'html.parser')
+    # Get all the links
+    allLinks = soup.find(id="bodyContent").find_all("a")
+    random.shuffle(allLinks)
+    linkToScrape = 0
+    materials = []
+
+    for link in allLinks:
+        # We are only interested in other wiki articles
+        if link['href'].find("/wiki/") == -1:
+            continue
+
+        # Use this link to scrape
+        materials.append(str(link.contents[0]))
+
+    materials.insert(0, "nylon")
+    return materials
+
+
+def extract_article_material(articles, materials):
+    print("extracting materials...")
+
+    articles["material"] = ""
+    for index, article in articles.iterrows():
+        for material in materials:
+            if article["detail_desc"] == 0:
+                break
+            desc = article["detail_desc"].lower()
+            if material in article["detail_desc"]:
+                article["material"] = material
+                break
+
+
+        articles[articles["article_id"] == article["article_id"]] = article
+
+    print("extraction done!")
+
+    articles.drop(columns=["detail_desc"], inplace=True)
+    return articles
+
 if __name__ == "__main__":
-    a = [[1, 0, 7, 3, 2, 10, 10], [0, 3, 5, 0, 11, 15, 60]]
-    b = [[1, 0, 7, 3, 2, 11, 10], [0, 3, 5, 0, 12, 15, 60]]
-    res = map_at_k(a, b, 12)
+    # a = [[1, 0, 7, 3, 2, 10, 10], [0, 3, 5, 0, 11, 15, 60]]
+    # b = [[1, 0, 7, 3, 2, 11, 10], [0, 3, 5, 0, 12, 15, 60]]
+    # res = map_at_k(a, b, 12)
+    pass

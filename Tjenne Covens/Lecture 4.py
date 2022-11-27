@@ -7,7 +7,7 @@ import lightgbm as lgb
 from ast import literal_eval
 
 from LabelEncoder import MultiLabelEncoder
-from utils import map_at_12, extract_last_week_sales, extract_all_but_last_week_sales
+from utils import *
 from Parameters import PARAM
 
 def warn(*args, **kwargs):
@@ -30,11 +30,23 @@ def load_data():
     customers = pd.read_csv('../../customers_sample1.csv.gz')
     print("loading transactions ...")
     transactions = pd.read_csv('../../transactions_sample1.csv.gz')
-    print("creating samples ...")
     return transactions, articles, customers
 
 
+def load_pkl():
+    print("loading articles ...")
+    articles = pd.read_pickle('articles_pp.pkl')
+    print("loading customers ...")
+    customers = pd.read_pickle('customers_pp.pkl')
+    print("loading transactions ...")
+    transactions = pd.read_pickle('transactions_pp.pkl')
+    print("loading samples ...")
+    samples = pd.read_pickle('samples.pkl')
+    return transactions, articles, customers, samples
+
+
 def create_sample(transactions, articles, customers):
+    print("creating samples ...")
     transactions['ordered'] = 1
     positive_pairs = list(map(tuple, transactions[['customer_id', 'article_id']].drop_duplicates().values))
     # Extract real values
@@ -73,11 +85,12 @@ def create_sample(transactions, articles, customers):
     samples = pd.concat([transactions, chosen_neg_transactions])
     samples = samples.merge(customers, how="inner", on='customer_id')
     samples = samples.merge(articles, how="inner", on='article_id')
+    samples.to_pickle("samples.pkl")
     return samples
 
 
 def preprocess_transactions(transactions):
-    # I'm dropping a lot of columns, use them in your engineering tasks!
+    print("preprocessing transactions")
     transactions_processed = transactions[PARAM["transaction"]].copy()
     transactions_processed.head()
 
@@ -88,25 +101,34 @@ def preprocess_transactions(transactions):
 
     transactions_processed = multi_encoder.encode("article_id", "article_id", transactions_processed)
     transactions_processed = multi_encoder.encode("customer_id", "customer_id", transactions_processed)
-
+    transactions_processed.to_pickle("transactions_pp.pkl")
     return transactions_processed
 
 
 def preprocess_articles(articles):
+    print("preprocessing articles")
     articles_processed = articles[PARAM["article"]].copy()
     articles_processed = multi_encoder.encode("article_id", "article_id", articles_processed)
     articles_processed = articles_processed.fillna(0)
+
+    # materials
+    materials = scrape_materials()
+    articles_processed = extract_article_material(articles_processed, materials)
+    multi_encoder.create_encoder("material")
+    articles_processed = multi_encoder.encode("material", "material", articles_processed)
+    articles_processed.to_pickle("articles_pp.pkl")
 
     return articles_processed
 
 
 def preprocess_customers(customers):
+    print("preprocessing customers")
     customers_processed = customers[PARAM["customer"]].copy()
     multi_encoder.create_encoder("postal_code")
     customers_processed = multi_encoder.encode("customer_id", "customer_id", customers_processed)
     customers_processed = multi_encoder.encode("postal_code", "postal_code", customers_processed)
     customers_processed = customers_processed.fillna(0)
-
+    customers_processed.to_pickle("customers_pp.pkl")
     return customers_processed
 
 
@@ -140,19 +162,17 @@ def recent_sales_k_months(transactions, articles, k, candidates=None):
 
 
 def candidates_selection(transactions, articles, customers, samples, candidates=None):
-    recent_items = recent_sales_k_months(samples, articles, 2)
-    print("starting candidate selection")
-    candidates = k_nn_clustering(transactions, recent_items, customers, candidates)
-    if PARAM["SAVE"]:
-        save_candidates(candidates)
+    # recent_items = recent_sales_k_months(samples, articles, 2)
+    print("candidate selection ...")
+    candidates = k_nn_clustering(transactions, articles, customers, candidates)
+
     return candidates
 
 
-def k_nn_clustering(transactions, articles, customers, candidates=None, k=13600):
+def k_nn_clustering(transactions, articles, customers, candidates=None, k=0):
     # prepare transaction data
-    transactions.drop(columns=["t_dat", "ordered"], inplace=True)
     sales = transactions.merge(articles, how="inner", on='article_id')
-    sales.drop(columns=["price", "sales_channel_id"], inplace=True)
+    sales.drop(columns=["price", "sales_channel_id", "t_dat"], inplace=True)
 
     # prepare candidates dict
     if candidates is None:
@@ -160,7 +180,7 @@ def k_nn_clustering(transactions, articles, customers, candidates=None, k=13600)
     c = customers["customer_id"].values
     i = k
     for customer in range(k, len(c)):
-        if i % 100 == 0:
+        if i % 10 == 0:
             if i != k:
                 print(f"{i}/{len(c)}")
                 save_candidates(candidates)
@@ -182,8 +202,8 @@ def k_nn_clustering(transactions, articles, customers, candidates=None, k=13600)
         purchases = purchases.drop(columns=["customer_id", "article_id"])
 
 
-        k = purchases.shape[0] // 15
-        if k == 0:
+        k = 5
+        if purchases.shape[0] <= 5:
             k = 1
 
         # find clusters and calculate centroids
@@ -271,10 +291,10 @@ def rank_candidates(candidates, articles, samples):
 
 def save_candidates(candidates):
     df = pd.DataFrame(candidates)
-    df.to_csv('candidates.csv', mode='a', index=False, header=False)
+    df.to_csv('candidates1.csv', mode='a', index=False, header=False)
 
 
-def load_candidates(file="candidates.csv"):
+def load_candidates(file="candidates1.csv"):
     candidates = pd.read_csv(file)
     candidates["sims"] = candidates["sims"].apply(literal_eval)
     candidates = candidates.to_dict(orient='list')
@@ -301,8 +321,13 @@ def create_submission(candidates):
 
 
 if __name__ == "__main__":
+    transactions, articles, customers, samples = None, None, None, None
     # load dataset
-    transactions, articles, customers, samples = preprocess_data()
+    if PARAM["PP"]:
+        transactions, articles, customers, samples = preprocess_data()
+    else:
+        transactions, articles, customers, samples = load_pkl()
+
 
     candidates = {}
     # run candidate selection
@@ -312,6 +337,9 @@ if __name__ == "__main__":
     # load candidates from file
     if PARAM["LOAD"]:
         candidates = load_candidates()
+
+    if PARAM["SAVE"]:
+        save_candidates(candidates)
 
     # rank candidates and calculate precision
     # popular_items = recent_sales_k_months(transactions, articles, 6)

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.stats import rankdata
 
 
 def clean_articles(articles):
@@ -45,15 +46,21 @@ def clean_customers(customers):
     customers['FN'] = customers['FN'].astype(np.uint8)
     customers['Active'] = customers['Active'].replace(np.nan, 0)
     customers['Active'] = customers['Active'].astype(np.uint8)
-    customers['club_member_status'] = customers['club_member_status'].astype(str)
-    customers['fashion_news_frequency'] = customers['fashion_news_frequency'].replace(['NONE', np.nan, 'None'], 0)
-    customers['fashion_news_frequency'] = customers['fashion_news_frequency'].replace('Monthly', 1)
-    customers['fashion_news_frequency'] = customers['fashion_news_frequency'].replace('Regularly', 2)
-    customers['fashion_news_frequency'] = customers['fashion_news_frequency'].astype(np.uint8)
+    customers['club_member_status'] = customers['club_member_status'].astype(
+        str)
+    customers['fashion_news_frequency'] = customers[
+        'fashion_news_frequency'].replace(['NONE', np.nan, 'None'], 0)
+    customers['fashion_news_frequency'] = customers[
+        'fashion_news_frequency'].replace('Monthly', 1)
+    customers['fashion_news_frequency'] = customers[
+        'fashion_news_frequency'].replace('Regularly', 2)
+    customers['fashion_news_frequency'] = customers[
+        'fashion_news_frequency'].astype(np.uint8)
     customers['age'] = customers['age'].replace(np.nan, -1)
     customers['age'] = customers['age'].astype(np.int8)
     customers['postal_code'] = customers['postal_code'].astype(str)
     return customers
+
 
 def clean_transactions(transactions):
     transactions['t_dat'] = pd.to_datetime(transactions['t_dat'],
@@ -61,5 +68,10 @@ def clean_transactions(transactions):
     transactions['customer_id'] = transactions['customer_id'].astype(str)
     transactions['article_id'] = transactions['article_id'].astype(np.uint32)
     transactions['price'] = transactions['price'].astype(np.float16)
-    transactions['sales_channel_id'] = transactions['sales_channel_id'].astype(np.uint8)
+    transactions['sales_channel_id'] = transactions['sales_channel_id'].astype(
+        np.uint8)
+    # data set construction by taking only last week of transactions
+    transactions['week'] = transactions['t_dat'].dt.isocalendar().year * 53 + \
+                           transactions['t_dat'].dt.isocalendar().week
+    transactions['week'] = rankdata(transactions['week'], 'dense')
     return transactions

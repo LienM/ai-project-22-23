@@ -1,4 +1,8 @@
 import collections
+import time
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 import joblib
 import numpy as np
@@ -21,6 +25,8 @@ from lightgbm import LGBMRanker
 import lightgbm as lgb
 from surprise import Dataset, Reader, SVD
 from surprise.model_selection import cross_validate
+
+from BasilRommens.globals import usable_cols
 
 rand = 64
 
@@ -139,7 +145,7 @@ def get_candidate_bestsellers(transactions):
     sales = transactions \
         .groupby('week')['article_id'].value_counts() \
         .groupby('week').rank(method='dense', ascending=False) \
-        .groupby('week').head(20).rename('bestseller_rank').astype('int8')
+        .groupby('week').head(12).rename('bestseller_rank').astype('int8')
 
     # merge the mean price and the sales
     bestsellers_previous_week = pd.merge(sales, mean_price,
@@ -214,9 +220,96 @@ def last_purchase_candidates(transactions):
     return candidates_last_purchase
 
 
-def age_bin_candidates(transactions, bin_size=1):
+def get_age_interval_idx(age, *intervals):
+    if type(intervals[0]) != list:
+        intervals = [intervals]
+    for interval_idx, interval in enumerate(intervals):
+        if interval[0] <= age <= interval[1]:
+            return interval_idx
+
+    return -1  # default value
+
+
+def get_interval_ranking(transactions, cur_interval):
+    # take only transactions in cur_interval
+    interval_transactions = transactions[transactions['age'].isin(cur_interval)]
+    ranking = interval_transactions \
+        .groupby('product_type_no')['product_type_no'].sum() \
+        .rank(method='dense').rename('rank') \
+        .astype(np.uint8) \
+        .reset_index() \
+        .sort_values('rank').head(12)
+    return ranking.to_numpy()
+
+
+def compare_rankings(ranking_1, ranking_2):
+    # first item in the
+    sim = 0
+    for key_2, rank_idx_2 in ranking_2:
+        added = False
+        for key_1, rank_idx_1 in ranking_1:
+            if key_1 == key_2:
+                sim += abs(rank_idx_1 - rank_idx_2)
+                added = True
+                break
+        if not added:
+            sim += max(len(ranking_1), len(ranking_2)) * 2
+    return sim
+
+
+def smart_merge_intervals(transactions):
+    count = transactions \
+        .groupby('age')['product_type_no'].value_counts() \
+        .rename('count') \
+        .reset_index().merge(transactions, on=['age', 'product_type_no'])
+
+    #     .groupby('age').head(10) \
+    #     .astype(np.uint8) \
+
+    transactions = transactions.sort_values('age')
+    intervals = list()
+    cur_interval = list()
+    threshold = 100
+    sims = list()
+    for age in transactions['age'].unique():
+        if age == -1:  # skip if default value
+            continue
+        if not cur_interval:
+            cur_interval.append(age)
+            continue
+        # append age to current interval if age is compatible with cur_interval
+        # set
+        interval_ranking = get_interval_ranking(count, cur_interval)
+        age_ranking = get_interval_ranking(transactions, [age])
+        sim = compare_rankings(interval_ranking, age_ranking)
+        sims.append(sim)
+        if sim < threshold:
+            cur_interval.append(age)
+        else:
+            intervals.append(cur_interval.copy())
+            cur_interval.clear()
+            cur_interval.append(age)
+    sims = sorted(sims)
+    sns.histplot(x=sims)
+    plt.show()
+
+    correct_intervals = list()
+    for interval in intervals:
+        new_interval = [interval[0], interval[-1]]
+        correct_intervals.append(new_interval)
+    return correct_intervals
+
+
+def age_bin_candidates(transactions, bin_size=1, intervals=None):
     # add bin size to the age column
-    transactions['age_bin'] = transactions['age'] // bin_size
+    if intervals is None:  # use bin size if no intervals are given
+        transactions['age_bin'] = transactions['age'] // bin_size
+    else:  # use intervals if they are given
+        print(intervals)
+        transactions['age_bin'] = transactions['age']
+        transactions['age_bin'] = transactions['age_bin'] \
+            .apply(get_age_interval_idx, args=(intervals))
+    transactions['age_bin'].astype(np.uint8)
     # TRAINING WEEK CANINATES
     # group the articles by week and get the counts, take top 12 candidates and
     # add a rank
@@ -262,44 +355,39 @@ def age_bin_candidates(transactions, bin_size=1):
     return candidates_bestsellers, bestsellers_previous_week
 
 
+def get_last_weeks_popularity_el(transactions, group_el, pop_type):
+    transactions_up_shift_week = transactions.copy()
+    transactions_up_shift_week['week'] += 1
+    pop = \
+        transactions_up_shift_week.groupby(['week', group_el],
+                                           as_index=False)[['ordered']].sum()
+    pop[pop_type] = pop['ordered']
+    pop = pop.drop('ordered', axis=1)
+    transactions = transactions.merge(pop, on=['week', group_el])
+    return transactions
+
+
 def get_last_weeks_popularity(pop_type, transactions):
     if pop_type == 'item_popularity':
-        transactions_up_shift_week = transactions.copy()
-        transactions_up_shift_week['week'] += 1
-        pop = transactions_up_shift_week.groupby(['week', 'article_id'],
-                                                 as_index=False)[
-            ['ordered']].sum()
-        pop[pop_type] = pop['ordered']
-        pop = pop.drop('ordered', axis=1)
-        transactions = transactions.merge(pop, on=['week', 'article_id'])
+        transactions = get_last_weeks_popularity_el(transactions, 'article_id',
+                                                    pop_type)
     elif pop_type == 'colour_popularity':
-        transactions_up_shift_week = transactions.copy()
-        transactions_up_shift_week['week'] += 1
-        pop = transactions_up_shift_week.groupby(['week', 'colour_group_code'],
-                                                 as_index=False)[
-            ['ordered']].sum()
-        pop[pop_type] = pop['ordered']
-        pop = pop.drop('ordered', axis=1)
-        transactions = transactions.merge(pop, on=['week', 'colour_group_code'])
+        transactions = get_last_weeks_popularity_el(transactions,
+                                                    'colour_group_code',
+                                                    pop_type)
     elif pop_type == 'product_type_popularity':
-        transactions_up_shift_week = transactions.copy()
-        transactions_up_shift_week['week'] += 1
-        pop = transactions_up_shift_week.groupby(['week', 'product_type_no'],
-                                                 as_index=False)[
-            ['ordered']].sum()
-        pop[pop_type] = pop['ordered']
-        pop = pop.drop('ordered', axis=1)
-        transactions = transactions.merge(pop, on=['week', 'product_type_no'])
-
+        transactions = get_last_weeks_popularity_el(transactions,
+                                                    'product_type_no', pop_type)
     return transactions[pop_type]
 
 
-if __name__ == '__main__':
-    # prepare_feather_datasets()
-    articles, customers, transactions = read_data_set('feather')
-    # articles, customers, transactions = part_data_set('01')
-    customer_encoder = joblib.load('../data/customer_encoder.joblib')
+def show_feature_importances():
+    for i in model.feature_importances_.argsort()[::-1]:
+        print(usable_cols[i], model.feature_importances_[
+            i] / model.feature_importances_.sum())
 
+
+def get_relevant_cols(articles, customers, transactions):
     # taking the relevant columns of all dataframes
     relevant_article_cols = ['article_id', 'product_type_no',
                              'graphical_appearance_no', 'colour_group_code',
@@ -308,60 +396,149 @@ if __name__ == '__main__':
                              'index_group_no', 'section_no', 'garment_group_no']
     relevant_customer_cols = ['customer_id', 'FN', 'Active',
                               'fashion_news_frequency', 'age', 'postal_code']
-    relevant_transaction_cols = ['t_dat', 'customer_id', 'article_id', 'price',
-                                 'sales_channel_id']
+    relevant_transaction_cols = ['customer_id', 'article_id', 'price',
+                                 'sales_channel_id', 'week']
     articles = articles[relevant_article_cols]
     customers = customers[relevant_customer_cols]
     transactions = transactions[relevant_transaction_cols]
+    return articles, customers, transactions
 
-    # data set construction by taking only last week of transactions
-    transactions['week'] = transactions['t_dat'].dt.isocalendar().year * 53 + \
-                           transactions['t_dat'].dt.isocalendar().week
-    transactions['week'] = rankdata(transactions['week'], 'dense')
 
-    test_week = transactions.week.max() + 1
-    transactions = transactions[
-        transactions.week > transactions.week.max() - 10]
+def construct_X_y(df, usable_cols):
+    X = df[usable_cols]
+    try:
+        y = df[['ordered']]
+    except Exception as e:
+        y = None
+    return X, y
+
+
+def last_n_week_transactions(transactions, n):
+    return transactions[transactions.week > last_week - n]
+
+
+def merge_transactions(transactions, articles, customers):
+    transactions = transactions.merge(articles, on='article_id')
+    transactions = transactions.merge(customers, on='customer_id')
+    transactions = transactions.reset_index(drop=True)
+    return transactions
+
+
+def get_bestseller_dict(age_bestsellers_previous_week):
+    bestsellers_last_week = \
+        age_bestsellers_previous_week[
+            age_bestsellers_previous_week.week == last_week][
+            ['article_id', 'age_bin']]
+    bestsellers_age_bin_dict = {age_bin: list(bestsellers_last_week[
+                                                  bestsellers_last_week[
+                                                      'age_bin'] == age_bin][
+                                                  'article_id'].values) for
+                                age_bin in
+                                bestsellers_last_week['age_bin'].unique()}
+    return bestsellers_age_bin_dict
+
+
+def get_cid_2_preds(test):
+    return test \
+        .sort_values(['customer_id', 'preds'], ascending=False) \
+        .groupby('customer_id')['article_id'].apply(list).to_dict()
+
+
+def get_cid_2_age_bin(transactions):
+    return transactions.groupby('customer_id')['age_bin'] \
+        .first() \
+        .to_dict()
+
+
+def make_and_write_predictions(model, test, age_bestsellers_previous_week,
+                               customers, customer_encoder, transactions):
+    # get the predictions and convert to dict
+    test['preds'] = model.predict(X_test)
+    c_id2predicted_article_ids = get_cid_2_preds(test)
+    # get the bestsellers for each age bin and convert to a dict
+    bestsellers_age_bin_dict = get_bestseller_dict(
+        age_bestsellers_previous_week)
+    # construct the predictions
+    customer_ids = customers['customer_id'].unique()
+    sub = pd.DataFrame(
+        {'customer_id': customer_encoder.inverse_transform(customer_ids),
+         'prediction': ['' for _ in range(len(customer_ids))]})
+    # add predictions for the customers and add most popular to them
+    preds = []
+    cid_2_age_bin = get_cid_2_age_bin(transactions)
+    for customer_id in tqdm(customers['customer_id'].unique()):
+        # if not in the age bin dict then use the garbage bin
+        if customer_id not in cid_2_age_bin.keys():
+            customer_age_bin = -1
+        else:
+            customer_age_bin = cid_2_age_bin.get(customer_id, -1)
+
+        # return the customer specific predictions
+        pred = c_id2predicted_article_ids.get(customer_id, [])
+        # get the bestsellers of the age bin
+        bestsellers_age_bin = bestsellers_age_bin_dict.get(customer_age_bin, [])
+
+        # combine custom and bestseller predictions
+        pred = pred + bestsellers_age_bin
+
+        # only take the last predictions
+        preds.append(pred[:12])
+    # convert the predictions to a string
+    preds = [' '.join(['0' + str(p) for p in ps]) for ps in preds]
+    sub['prediction'] = preds
+    # name and write the predictions
+    sub_name = 'all_interval_smart_100'
+    sub.to_csv(f'../out/{sub_name}.csv.gz', index=False)
+
+
+if __name__ == '__main__':
+    # prepare_feather_datasets()
+    articles, customers, transactions = read_data_set('feather')
+    # articles, customers, transactions = part_data_set('01')
+
+    # encode and decode customer ids
+    customer_encoder = joblib.load('../data/customer_encoder.joblib')
+
+    articles, customers, transactions = get_relevant_cols(articles, customers,
+                                                          transactions)
+
+    last_week = transactions['week'].max()
+    test_week = last_week + 1
+
+    # get transactions in the last n weeks
+    transactions = last_n_week_transactions(transactions, 12)
 
     # label the ordered columns
     transactions['ordered'] = 1
 
-    # Concat the negative samples to the positive samples:
-    # transactions = pd.concat([transactions, neg_transactions])
-    transactions = transactions.merge(articles, on='article_id')
+    # combine the transactions dataframe with all the articles
+    transactions = merge_transactions(transactions, articles, customers)
     del articles
-    transactions = transactions.merge(customers, on='customer_id')
-    transactions = transactions.reset_index(drop=True)
 
-    # from here all the code has been used from
+    # from here all the code has been used from unless marked otherwise
     # https://github.com/radekosmulski/personalized_fashion_recs/blob/main/03c_Basic_Model_Submission.ipynb
-    # unless marked otherwise
     # get the candidates last purchase
-    # candidates_bestsellers, bestsellers_previous_week = \
-    #     get_candidate_bestsellers(transactions)
+    candidates_bestsellers, bestsellers_previous_week = \
+        get_candidate_bestsellers(transactions)
     # get the candidates bestsellers
-    # candidates_last_purchase = last_purchase_candidates(transactions)
-    # own: get the candidates age bin
-    bin_size = 16
+    candidates_last_purchase = last_purchase_candidates(transactions)
+    # OWN: get the candidates age bin
+    bin_size = 2
+    # intervals = None
+    # intervals = [[16, 40], [41, 70]]
+    intervals = smart_merge_intervals(transactions)
     candidates_age_bin, age_bestsellers_previous_week = age_bin_candidates(
-        transactions, bin_size)
+        transactions, bin_size, intervals=intervals)
 
     # add the non-ordered items
     transactions = pd.concat(
-        [transactions, candidates_age_bin])
+        [transactions, candidates_age_bin, candidates_bestsellers,
+         candidates_last_purchase])
     transactions['ordered'] = transactions['ordered'].fillna(0)
 
     transactions = transactions.drop_duplicates(
         subset=['customer_id', 'article_id', 'week'], keep=False)
 
-    # Concat the negative samples to the positive samples:
-    # transactions = transactions.merge(articles, on='article_id')
-    # del articles
-    # transactions = transactions.merge(customers, on='customer_id')
-    # del customers
-    # transactions = transactions.reset_index(drop=True)
-
-    last_transaction_week = transactions['week'].max()
     # # add last weeks item popularity to transactions
     # pop_type = 'item_popularity'
     # transactions[pop_type] = get_last_weeks_popularity(pop_type, transactions)
@@ -372,20 +549,20 @@ if __name__ == '__main__':
     # pop_type = 'product_type_popularity'
     # transactions[pop_type] = get_last_weeks_popularity(pop_type, transactions)
 
-    usable_cols = ['article_id', 'product_type_no', 'graphical_appearance_no',
-                   'perceived_colour_value_id', 'perceived_colour_master_id',
-                   'department_no', 'index_group_no', 'section_no',
-                   'FN', 'Active', 'fashion_news_frequency', 'age',
-                   'age_bestseller_rank']
     transactions['ordered'] = transactions['ordered'].astype(
         np.uint8)
-    # merge the previous week bestsellers to the transactions as it will add the
-    # rank
+    # merge the previous week bestsellers to transactions as it adds the rank
     transactions = pd.merge(
         transactions,
         age_bestsellers_previous_week[
             ['week', 'age_bin', 'article_id', 'age_bestseller_rank']],
         on=['week', 'age_bin', 'article_id'],
+        how='left'
+    )
+    transactions = pd.merge(
+        transactions,
+        bestsellers_previous_week[['week', 'article_id', 'bestseller_rank']],
+        on=['week', 'article_id'],
         how='left'
     )
 
@@ -395,6 +572,7 @@ if __name__ == '__main__':
 
     # change the values for the non-bestsellers to 999
     transactions['age_bestseller_rank'].fillna(999, inplace=True)
+    # transactions['bestseller_rank'].fillna(999, inplace=True)
 
     # sort the transactions by week and customer_id
     transactions = transactions \
@@ -410,9 +588,8 @@ if __name__ == '__main__':
         .copy()
 
     # construct a suitable X and y (where y indicates ordered or not)
-    X_train = train[usable_cols]
-    y_train = train[['ordered']]
-    X_test = test[usable_cols]
+    X_train, y_train, = construct_X_y(train, usable_cols)
+    X_test, _ = construct_X_y(test, usable_cols)
 
     # create a model
     model = lgb.LGBMRanker(objective='lambdarank',
@@ -424,72 +601,9 @@ if __name__ == '__main__':
                       eval_metric='ndcg', eval_set=[(X_train, y_train)],
                       eval_group=[group_sizes])
 
-    for i in model.feature_importances_.argsort()[::-1]:
-        print(usable_cols[i], model.feature_importances_[
-            i] / model.feature_importances_.sum())
+    # show feature importances
+    show_feature_importances()
 
-    # get the predictions
-    test['preds'] = model.predict(X_test)
-
-    c_id2predicted_article_ids = test \
-        .sort_values(['customer_id', 'preds'], ascending=False) \
-        .groupby('customer_id')['article_id'].apply(list).to_dict()
-
-    bestsellers_last_week = \
-        age_bestsellers_previous_week[
-            age_bestsellers_previous_week.week == age_bestsellers_previous_week.week.max()][
-            'article_id'].tolist()
-
-    # construct the predictions
-    customer_ids = customers['customer_id'].unique()
-    sub = pd.DataFrame(
-        {'customer_id': customer_encoder.inverse_transform(customer_ids),
-         'prediction': ['' for _ in range(len(customer_ids))]})
-
-    # add predictions for the customers and add most popular to them
-    preds = []
-    for customer_id in customers['customer_id'].unique():
-        pred = c_id2predicted_article_ids.get(customer_id, [])
-        # pred = pred + bestsellers_last_week
-        preds.append(pred[:12])
-
-    preds = [' '.join(['0' + str(p) for p in ps]) for ps in preds]
-    sub['prediction'] = preds
-
-    sub_name = 'age_bin_16'
-    sub.to_csv(f'../data/{sub_name}.csv.gz', index=False)
-
-    # the commented out code has never been used
-    # accuracy = model.score(X_va, y_va)
-    # print(accuracy)
-    # reader = Reader(rating_scale=(0, 1))
-    # data = Dataset.load_from_df(
-    #     X_reduced[["customer_id", "article_id", "relevant"]], reader)
-    # trainset = data.build_full_trainset()
-    # # Use the famous SVD algorithm.
-    # model = SVD()
-    # model.fit(trainset)
-
-    # topn = predict_topn(X_reduced, model)
-
-    # # train predictor
-    # # get most popular items
-    # top_counts = collections.Counter(X_transactions.groupby('article_id')[
-    #                                      'article_id'].count().to_dict()).most_common(
-    #     12)
-
-    # write all the predictions
-    # predictions = ['customer_id,prediction\n']
-    # for customer_id in customers['customer_id'].unique():
-    #     if customer_id not in topn.keys():
-    #         continue
-    #     top_counts = topn[customer_id]
-    #     customer_predictions = popular_predictor(customer_id, top_counts)
-    #     prediction_line = customer_id + ',' + customer_predictions + '\n'
-    #     predictions.append(prediction_line)
-    #
-    # with open('../data/predictions.csv', 'w') as f:
-    #     f.writelines(predictions)
-    # pred = pd.read_csv('../data/predictions.csv')
-
-    # print(map_at_k(rel_items=y_transactions, users=pred, n=12, k=12))
+    # make and write predictions
+    make_and_write_predictions(model, test, age_bestsellers_previous_week,
+                               customers, customer_encoder, transactions)

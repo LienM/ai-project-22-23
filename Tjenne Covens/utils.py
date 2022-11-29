@@ -130,7 +130,7 @@ def scrape_materials():
 
 
 def extract_article_material(articles, materials):
-    print("extracting materials...")
+    print("     extracting materials...")
 
     articles["material"] = ""
     for index, article in articles.iterrows():

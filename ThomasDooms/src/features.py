@@ -85,16 +85,16 @@ def customers_features(customers):
 
 def all_features(test=False):
     transactions = pd.read_feather(path("transactions", 'sample' if test else 'full'))
-    # articles = pd.read_feather(path("articles", 'full'))
-    # customers = pd.read_feather(path("customers", 'full'))
+    articles = pd.read_feather(path("articles", 'full'))
+    customers = pd.read_feather(path("customers", 'full'))
 
     transactions = transactions_features(transactions)
-    # articles = articles_features(articles, transactions)
-    # customers = customers_features(customers)
+    articles = articles_features(articles, transactions)
+    customers = customers_features(customers)
 
     transactions.to_feather(path("transactions", 'selected' if test else 'features'))
-    # articles.to_feather(path("articles", 'features'))
-    # customers.to_feather(path("customers", 'features'))
+    articles.to_feather(path("articles", 'features'))
+    customers.to_feather(path("customers", 'features'))
 
 
 if __name__ == '__main__':

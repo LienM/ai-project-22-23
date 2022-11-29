@@ -2,7 +2,7 @@ import pandas as pd
 from lightgbm.sklearn import LGBMRanker
 
 
-def rank(data, verbose=True):
+def rank(data, verbose=True, frac=1):
     """
     Create train and test sets for LightGBM Ranker
     Train LightGBM model and make predictions
@@ -29,7 +29,7 @@ def rank(data, verbose=True):
         objective="lambdarank",
         metric="map",
         boosting_type="dart",
-        n_estimators=100,
+        n_estimators=int(frac * 100),
         importance_type='gain',
         verbose=10 if verbose else 1
     )

@@ -155,32 +155,35 @@ def recent_sales_k_months(transactions, articles, k, candidates=None):
     # Getting all sold items within the last 6 months
     recent_items = dated_transactions.loc[dated_transactions["transaction_age_months"] < k]
     recent_items = recent_items["article_id"].value_counts().rename_axis("article_id").reset_index(name="count")
-    recent_items = recent_items.sort_values(by="count", ascending=False)["article_id"].head(100)
-    # recent_items = recent_items.merge(articles, how="inner", on="article_id")
+    # recent_items = recent_items.sort_values(by="count", ascending=False)["article_id"].head(100)
+    recent_items = recent_items.sort_values(by="count", ascending=False).head(1000)
+    recent_items.drop(columns=["count"], inplace=True)
+    recent_items = recent_items.merge(articles, how="inner", on="article_id")
+    # return list(recent_items)
 
-    return list(recent_items)
+    return recent_items
 
 
 def candidates_selection(transactions, articles, customers, samples, candidates=None):
-    # recent_items = recent_sales_k_months(samples, articles, 2)
+    recent_items = recent_sales_k_months(samples, articles, 2)
     print("candidate selection ...")
-    candidates = k_nn_clustering(transactions, articles, customers, candidates)
+    candidates = k_nn_clustering(transactions, recent_items, customers, candidates)
 
     return candidates
 
 
-def k_nn_clustering(transactions, articles, customers, candidates=None, k=0):
+def k_nn_clustering(transactions, articles, customers, candidates=None, k=13673):
     # prepare transaction data
     sales = transactions.merge(articles, how="inner", on='article_id')
-    sales.drop(columns=["price", "sales_channel_id", "t_dat"], inplace=True)
-
+    sales.drop(columns=["sales_channel_id", "t_dat"], inplace=True)
+    articles = articles.merge(transactions[["article_id", "price"]].copy(), how="inner", on="article_id")
     # prepare candidates dict
     if candidates is None:
         candidates = {"customers": [], "sims": []}
-    c = customers["customer_id"].values
+    c = list(customers["customer_id"].values)
     i = k
     for customer in range(k, len(c)):
-        if i % 10 == 0:
+        if i % 50 == 0:
             if i != k:
                 print(f"{i}/{len(c)}")
                 save_candidates(candidates)
@@ -209,10 +212,14 @@ def k_nn_clustering(transactions, articles, customers, candidates=None, k=0):
         # find clusters and calculate centroids
         clusters = KMeans(n_clusters=k, init="k-means++", random_state=0).fit(purchases)
         centroids = clusters.cluster_centers_
+        added_articles = []
 
         # find K nearest neighbourgs
         for index, article in articles.iterrows():
             article_id = int(article["article_id"])
+            if article_id in added_articles:
+                continue
+
             # if article_id in purchased_articles:
             #     continue
             value_list = article.values.tolist()
@@ -227,6 +234,7 @@ def k_nn_clustering(transactions, articles, customers, candidates=None, k=0):
                 if similarity >= top_similarity:
                     top_similarity = similarity
             similarities[index] = {"article_id": article_id, "sim": top_similarity}
+            added_articles.append(article_id)
 
         sim_df = pd.DataFrame.from_dict(similarities, "index")
         sim_df = sim_df.sort_values(by=["sim"], ascending=False)

@@ -22,11 +22,13 @@ def main(
         itemknn=True,
         l0=True,
         w2v=True,
+        p2v=True,
 ):
     methods = []
     if itemknn: methods.append('itemknn')
     if l0: methods.append('l0')
     if w2v: methods.append('w2v')
+    if p2v: methods.append('p2v')
     print(
         f"Running with: frac={frac}, n={n}, n_train_weeks={n_train_weeks}, ratio={ratio}, cv={cv}, verbose={verbose}, methods={methods}")
 
@@ -35,12 +37,13 @@ def main(
     write_sub = not cv
 
     # load data
-    data_dict = load_data(verbose=verbose, frac=frac)
+    data_dict = load_data(verbose=verbose, frac=frac, seed=42)
 
     if cv:  # make train and validation sets
         transactions, transactions_val = test_train_split(data_dict['transactions'])
         data_dict['transactions'] = transactions
-        transactions_val = customer_id_transform(transactions_val, "customer_id")
+        data_dict['transactions_val'] = transactions_val
+        transactions_val = customer_id_transform(data_dict['transactions_val'], "customer_id")
         data_dict['transactions_val'] = transactions_val
 
     # preprocess data
@@ -49,14 +52,23 @@ def main(
     # generate samples and candidates
     data_dict = samples(data_dict, n_train_weeks=n_train_weeks, n=n, ratio=ratio, methods=methods, verbose=verbose)
 
+    if cv:
+        train_customers = data_dict['transactions']['customer_id'].unique()
+        val_customers = data_dict['transactions_val']['customer_id'].unique()
+        print(f"#Customers in train: {len(train_customers)}")
+        print(f"#Customers in val: {len(val_customers)}")
+        n_intersect = len(set(val_customers) - set(train_customers))
+        print(
+            f"#Customers in val but not in train: {n_intersect}, {n_intersect / len(val_customers) * 100:.2f}% of val")
+
     # train model and make predictions
-    predictions = rank(data_dict, verbose=verbose)
+    predictions = rank(data_dict, verbose=verbose, frac=frac)
 
     if cv:  # evaluate predictions
         map_score = map_at_12(predictions, data_dict['transactions_val'])
-        print(f"MAP@12: {map_score}")
+        print(f"MAP@12: {map_score:.4f}")
         recall = candidates_recall_test(data_dict, data_dict['transactions_val'])
-        print(f"RECALL of candidates: {recall}")
+        print(f"RECALL of candidates: {recall:.4f}")
         return map_score, recall
 
     if write_sub:  # write submission
@@ -79,6 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--itemknn', action='store_true', default=False)
     parser.add_argument('--l0', action='store_true', default=False)
     parser.add_argument('--w2v', action='store_true', default=False)
+    parser.add_argument('--p2v', action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -103,4 +116,5 @@ if __name__ == '__main__':
         itemknn=args.itemknn,
         l0=args.l0,
         w2v=args.w2v,
+        p2v=args.p2v,
     )

@@ -112,7 +112,7 @@ def get_similar_items(articles, transactions, n, sim_type, last_week_customers_o
 #     sim_sam = merge_downcast(custumers_to_use, sim_sam, on=['week', 'customer_id'])
 #     return sim_sam
 
-def get_similarity_samples(data, transactions, n, sim_type, unique_transactions, test_set_transactions):
+def get_similarity_samples(data, transactions, n, sim_type, unique_transactions, test_set_transactions, scale_n=False):
     """
     Get negative samples for each week
     Get candidates for prediction
@@ -131,8 +131,11 @@ def get_similarity_samples(data, transactions, n, sim_type, unique_transactions,
     for w in tqdm(range(transactions.week.min() + 1, transactions.week.max() + 2), desc=f"{sim_type} samples per week"):
         customers_to_use = unique_transactions if w < transactions.week.max() + 1 else test_set_transactions
         # get more samples for latter weeks, less for earlier weeks
-        i = int((w - transactions.week.min()) / (transactions.week.max() + 1 - transactions.week.min()) * n)
-        i = max(1, i)
+        if scale_n:
+            i = int((w - transactions.week.min()) / (transactions.week.max() + 1 - transactions.week.min()) * n)
+            i = max(1, i)
+        else:
+            i = n
         transactions_w = transactions[transactions.week < w]
         sim_matrix, article_map, sim_sam = get_similar_items(data['articles'],
                                                              transactions_w,
@@ -147,3 +150,44 @@ def get_similarity_samples(data, transactions, n, sim_type, unique_transactions,
                              previous_week_info[['week', 'article_id', 'price']],
                              on=['week', 'article_id'], how='left')
     return sim_matrix, article_map, samples
+
+
+def add_similarity(samples, purchase_hist, sim, sim_index):
+    """
+    Add similarity to samples
+    Pretty slow but oh well
+    :param samples:
+    :param purchase_hist:
+    :param sim:
+    :param sim_index:
+    :return:
+    """
+    print(f"Adding similarity to samples...")
+    purchase_hist = purchase_hist.set_index(['customer_id', 'week'])
+    # turn items of purchase history into indices
+    purchase_hist['purchase_history'] = purchase_hist['purchase_history'].apply(
+        lambda x: [sim_index[item] for item in x])
+    hist = purchase_hist.to_dict("index")
+    min_week = samples.week.min()
+
+    def get_sim(row):
+        article_idx = sim_index[row[1]]
+        key = (row[0], row[2])
+        while key not in hist:
+            if key[1] < min_week:
+                return float(0)
+            key = (key[0], key[1] - 1)
+        return sim[article_idx, hist[key]['purchase_history']].mean()
+
+    # try:
+    #     s = samples[['customer_id', 'article_id', 'week']]. \
+    #         swifter.progress_bar(enable=True, desc=f"Calculating similarity"). \
+    #         apply(lambda x: get_sim(x), axis=1, raw=True)
+    # except Exception as e:
+    #     print(f"Swifter failed")
+    #     print(e)
+    tqdm.pandas()
+    s = samples[['customer_id', 'article_id', 'week']].progress_apply(lambda x: get_sim(x), axis=1,
+                                                                      raw=True)
+
+    return s

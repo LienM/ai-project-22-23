@@ -1,13 +1,3 @@
-# ============================================================================
-# @author      : Thomas Dooms
-# @date        : 14/11/22
-# @copyright   : MA2 Computer Science - Thomas Dooms - University of Antwerp
-# ============================================================================
-
-import os
-import pickle
-
-import pandas as pd
 from lightgbm import LGBMRanker
 
 
@@ -16,10 +6,18 @@ from lightgbm import LGBMRanker
 
 
 def train_model(train, columns):
+    """
+    Train a model on the given data.
+    :param train: the training data
+    :param columns: the columns to use for training
+    :return: the model
+    """
     groups = train.groupby(["week", "customer_id"])["article_id"].count().values
 
-    # seed = 42069  # picked by pure random chance
+    # picked by pure random chance
+    # seed = 42069
 
+    # I saw this config online, I don't fully know what it does differently, but it doesn't work so yeah
     # params = {
     #     "objective": "binary",
     #     "boosting": "gbdt",
@@ -37,8 +35,6 @@ def train_model(train, columns):
     #     "metric": "auc",
     #     "verbose": -1
     # }
-
-    print(train)
 
     # Actually train the model
     model = LGBMRanker(

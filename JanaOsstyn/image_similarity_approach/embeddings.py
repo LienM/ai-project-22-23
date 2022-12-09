@@ -100,7 +100,7 @@ class EmbeddingCalculator(BatchProcess):
     def can_run(self):
         """
         Quick check whether all preconditions (in terms of arguments) are met before run is executed.
-        This method is complemented with the preconditions of the subclass.
+        This method forms an extension on the self.can_run of the superclass.
         :return: True if all preconditions are met, False otherwise
         """
         return \

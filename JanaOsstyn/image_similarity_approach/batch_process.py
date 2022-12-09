@@ -21,12 +21,12 @@ class BatchProcess:
         Anything except modulename is to be set by the subclass.
         :param modulename: name of the module (e.g. embeddings, similarities,...)
         """
-        self.modulename = modulename
-        self.base_filenames = []
-        self.output_directory = None
-        self.__nr_rows_per_batch = None
-        self.__nr_rows = None
-        self.__nr_batches = None
+        self.modulename = modulename            # modulename (used for names of output files)
+        self.base_filenames = []                # one or more 'base' filenames (see self.join_files for more info)
+        self.output_directory = None            # directory for output files
+        self.__nr_rows_per_batch = None         # nr of rows each batch will have
+        self.__nr_rows = None                   # total nr of rows
+        self.__nr_batches = None                # nr of batches, calculated from self.nr_rows and self.nr_rows_per_batch
 
     @property
     def nr_rows_per_batch(self):  # getter

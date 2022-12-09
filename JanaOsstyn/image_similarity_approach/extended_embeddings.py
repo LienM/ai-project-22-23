@@ -81,7 +81,9 @@ class ExtendedEmbeddingCalculator(BatchProcess):
         This method forms an extension on the self.can_run of the superclass.
         :return: True if all preconditions are met, False otherwise
         """
-        return self.model is not None
+        return \
+            self.model is not None and \
+            super().can_run()
 
     # ------------------------------------------------------------------------------------------------------------------
     # pipeline methods

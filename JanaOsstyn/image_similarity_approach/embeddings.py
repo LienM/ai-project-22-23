@@ -106,7 +106,8 @@ class EmbeddingCalculator(BatchProcess):
         return \
             self.model is not None and \
             self.preprocess_input_function is not None and \
-            self.embedding_shape is not None and super().can_run()
+            self.embedding_shape is not None and \
+            super().can_run()
 
     # ------------------------------------------------------------------------------------------------------------------
     # pipeline methods

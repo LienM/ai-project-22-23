@@ -1,5 +1,5 @@
 import pandas as pd
-from recpack.algorithms import ItemKNN
+from recpack.algorithms import ItemKNN, Prod2Vec
 from recpack.pipelines import PipelineBuilder
 from recpack.preprocessing.filters import Deduplicate, MinUsersPerItem
 from recpack.preprocessing.preprocessors import DataFramePreprocessor
@@ -24,7 +24,7 @@ from preprocessing import *
 #     return df
 
 
-def get_recpack_samples(transactions, n=12):
+def get_recpack_samples(transactions, n=12, algorithm='prod2vec', customers=None):
     """
     Get top n items based on a recpack algorithm, for each customer with a purchase history
     :param transactions:
@@ -37,31 +37,33 @@ def get_recpack_samples(transactions, n=12):
     )
     df_pp.add_filter(MinUsersPerItem(1, "article_id", "customer_id"))
     interaction_matrix = df_pp.process(transactions)
-    algo = ItemKNN(K=100)
-    algo.fit(interaction_matrix)
+    if algorithm == 'itemknn':
+        algo = ItemKNN(K=100)
+        algo.fit(interaction_matrix)
+    elif algorithm == 'prod2vec':
+        scenario = StrongGeneralizationTimed(0.75, validation=True, t=transactions['week'].max() + 1,
+                                             t_validation=transactions['week'].max())
+        scenario.split(interaction_matrix)
+        algo = Prod2Vec()
+        algo.fit(scenario.full_training_data, (scenario.validation_data_in, scenario.validation_data_out))
+    else:
+        raise ValueError("Algorithm not supported")
+
     predictions = algo.predict(interaction_matrix)
+    valid_customers = customers
     customers = transactions['customer_id'].unique()
     articles = transactions['article_id'].unique()
     # get top 12 predictions for each customer
     results = []
     for i, customer in enumerate(tqdm(customers, desc=f"Generating top {n} recpack samples", leave=False)):
-        customer_predictions = predictions.getrow(i)
+        if valid_customers is not None and customer not in valid_customers:
+            continue
+        customer_predictions = predictions.getrow(i).toarray()[0]
         articles_sorted = np.argsort(customer_predictions)
         top_n = articles_sorted[:n]
         top_n = [articles[x] for x in top_n]
         df = pd.DataFrame({'customer_id': customer, 'article_id': top_n})
         results.append(df)
-
-    # repeat using multiprocessing Pool
-    # pool = Pool(6)
-    # for r in tqdm(pool.starmap(get_recpack_samples_for_customer,
-    #                             [(customer, i, predictions, articles, n) for i, customer in enumerate(customers)])
-    #               , desc=f"Generating top {n} recpack samples", total=len(customers), leave=False):
-    #     results.append(r)
-    # with Pool(7) as p:
-    #     results = p.starmap(get_recpack_samples_for_customer,
-    #                         [(customer, i, predictions, articles, n) for i, customer in enumerate(customers)])
-
     result_df = concat_downcast(results)
     return result_df.reset_index(drop=True)
 
@@ -88,6 +90,11 @@ def recpack_cv(data):
     builder.add_algorithm('ItemKNN', grid={
         'K': [100, 500, 1000, 5000, 10000],
     })
+    builder.add_algorithm('Prod2Vec', grid={
+        # 'num_components': [25, 50],
+        # 'K': [200, 500],
+        # 'num_negatives': [1, 5, 10],
+    })
     builder.set_optimisation_metric('NDCGK', K=12)
     builder.add_metric('NDCGK', K=[12, 50, 100, 300])
     builder.add_metric('CoverageK', K=[12, 50, 100, 300])
@@ -96,33 +103,48 @@ def recpack_cv(data):
     print(pd.DataFrame.from_dict(pipeline.get_metrics()))
 
 
-def add_recpack_score(samples, transactions):
+def add_recpack_score(samples, transactions, algorithm='prod2vec'):
     df_pp = DataFramePreprocessor(user_ix='customer_id', item_ix='article_id', timestamp_ix='week')
     df_pp.add_filter(
         Deduplicate("article_id", "customer_id", "week")
     )
     df_pp.add_filter(MinUsersPerItem(1, "article_id", "customer_id"))
-    for w in tqdm(transactions.week.unique()[1:], desc="Adding recpack scores", leave=False):
+    scores = pd.DataFrame()
+    for w in tqdm(samples.week.unique(), desc="Adding recpack scores", leave=False):
         transactions_w = transactions[transactions.week < w]
         customer_map = {c: i for i, c in enumerate(transactions_w.customer_id.unique())}
         article_map = {a: i for i, a in enumerate(transactions_w.article_id.unique())}
         interaction_matrix = df_pp.process(transactions_w)
-        algo = ItemKNN(K=100)
-        algo.fit(interaction_matrix)
-        predictions = algo.predict(interaction_matrix)
+        if algorithm == 'itemknn':
+            algo = ItemKNN(K=100)
+            algo.fit(interaction_matrix)
+        elif algorithm == 'prod2vec':
+            scenario = StrongGeneralizationTimed(0.75, validation=True, t=transactions['week'].max() + 1,
+                                                 t_validation=transactions['week'].max())
+            scenario.split(interaction_matrix)
+            algo = Prod2Vec()
+            algo.fit(scenario.full_training_data, (scenario.validation_data_in, scenario.validation_data_out))
+        else:
+            raise ValueError("Algorithm not supported")
 
-        samples['recpack_score'] = samples.loc[samples.week == w][['customer_id', 'article_id']]. \
+        predictions = algo.predict(interaction_matrix)
+        scores_w = samples[samples.week == w][['customer_id', 'article_id', 'week']]
+        scores_w[f'{algorithm}_score'] = scores_w. \
             progress_apply(
             lambda x: predictions[customer_map[x[0]], article_map[x[1]]] if x[0] in customer_map and x[
-                1] in article_map else float(0),
+                1] in article_map.keys() else float(0),
             axis=1, raw=True)
-        break
+        scores = pd.concat([scores, scores_w])
+    samples = merge_downcast(samples, scores, on=['customer_id', 'article_id', 'week'], how='left')
     return samples
 
 
 if __name__ == '__main__':
-    data = load_data(frac=1)
+    import warnings
+
+    warnings.filterwarnings("ignore")
+    data = load_data(frac=0.05)
     data = pp_data(data, {'w2v_vector_size': 0}, force=True, write=False)
     transactions = data['transactions']
-    data['transactions'] = transactions[transactions['week'] > transactions['week'].max() - 12]
+    data['transactions'] = transactions[transactions['week'] > transactions['week'].max() - 8]
     recpack_cv(data)

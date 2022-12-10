@@ -1,15 +1,18 @@
 import json
-
-import numpy as np
-import pandas as pd
 import os
+
+import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
-if not os.path.isdir('../data/lstm'):
-    os.mkdir('../data/lstm')
+"""
+Prepare the data for LSTM training.
+"""
+
+if not os.path.isdir('../../data/lstm'):
+    os.mkdir('../../data/lstm')
 
 # read dataframes, only keep customer_id and article_id
-transactions: pd.DataFrame = pd.read_csv('../data/transactions_train.csv', dtype=object)
+transactions: pd.DataFrame = pd.read_csv('../../data/transactions_train.csv', dtype=object)
 transactions = transactions[['customer_id', 'article_id']].copy()
 
 # concatenate and count article_ids
@@ -21,7 +24,7 @@ transactions = transactions.groupby(['customer_id'], as_index=False).agg({'artic
 transactions['num_article_ids'] = transactions['article_id'].str.count('\s') + 1
 
 # find users that did not purchase any article
-customers: pd.DataFrame = pd.read_csv('../data/customers.csv')
+customers: pd.DataFrame = pd.read_csv('../../data/customers.csv')
 customers = customers[['customer_id']].copy()
 customers['article_id'] = ''
 customers['num_article_ids'] = 0
@@ -48,11 +51,11 @@ print('Nr of users that purchased >= 3 articles:', transactions_gte_3_articles.s
 print(f'({round(((transactions_gte_3_articles.shape[0]) / customers.shape[0]) * 100, 2)}%)')
 
 # frames to file
-transactions.to_csv('../data/lstm/transactions.csv', index=False)
-transactions_gte_3_articles.to_csv('../data/lstm/transactions_gte_3_articles.csv', index=False)
-transactions_lt_3_articles.to_csv('../data/lstm/transactions_lt_3_articles.csv', index=False)
-transactions_0_articles.to_csv('../data/lstm/transactions_0_articles.csv', index=False)
-transactions_eq_1895_articles.to_csv('../data/lstm/transactions_eq_1895_articles.csv', index=False)
+transactions.to_csv('../../data/lstm/transactions.csv', index=False)
+transactions_gte_3_articles.to_csv('../../data/lstm/transactions_gte_3_articles.csv', index=False)
+transactions_lt_3_articles.to_csv('../../data/lstm/transactions_lt_3_articles.csv', index=False)
+transactions_0_articles.to_csv('../../data/lstm/transactions_0_articles.csv', index=False)
+transactions_eq_1895_articles.to_csv('../../data/lstm/transactions_eq_1895_articles.csv', index=False)
 
 # define vocabulary size
 vocabulary_size = transactions['article_id'].nunique() + 1
@@ -62,4 +65,4 @@ print('Vocabulary size:', vocabulary_size)
 max_len = transactions_gte_3_articles['num_article_ids'].max()
 print('Max # purchases by single user:', max_len)
 
-json.dump({'vocabulary_size': vocabulary_size, 'max_len': max_len}, open('../data/lstm/parameters.json', 'w'))
+json.dump({'vocabulary_size': vocabulary_size, 'max_len': max_len}, open('../../data/lstm/parameters.json', 'w'))

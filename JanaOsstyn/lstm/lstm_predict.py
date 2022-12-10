@@ -4,10 +4,15 @@ from tensorflow import keras
 from utils import *
 import os
 
-if not os.path.isdir('../data/output'):
-    os.mkdir('../data/output')
 
-for filename in ['../data/transactions_gte_3_articles.csv', '../data/transactions_lt_3_articles.csv']:
+"""
+Make predictions for each set of users (more than 3 purchases & less than 3 purchases)
+"""
+
+if not os.path.isdir('../../data/output'):
+    os.mkdir('../../data/output')
+
+for filename in ['../../data/transactions_gte_3_articles.csv', '../../data/transactions_lt_3_articles.csv']:
 
     # create sequences
     transactions = pd.read_csv(filename)

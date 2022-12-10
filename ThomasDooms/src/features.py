@@ -1,11 +1,3 @@
-# ============================================================================
-# @author      : Thomas Dooms
-# @date        : 14/11/22
-# @copyright   : MA2 Computer Science - Thomas Dooms - University of Antwerp
-# ============================================================================
-
-import time
-
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
@@ -14,6 +6,15 @@ from paths import path
 
 
 def articles_features(articles, df, name_components=8, description_components=8):
+    """
+    Generate features for the articles, this will mainly add the name and description embeddings
+    :param articles: the articles
+    :param df: the transactions but with a shorter name to make the code more readable
+    :param name_components: the number of features to embed the name by
+    :param description_components: the number of features to embed the description by
+    :return: the new and feature enriched articles
+    """
+    # Looking at some benchmarks this model has the best tradeoff between speed and accuracy
     model = SentenceTransformer('all-MiniLM-L6-v2')
 
     # Embed the product name into 16 columns
@@ -37,11 +38,9 @@ def articles_features(articles, df, name_components=8, description_components=8)
     cols = ['prod_name', 'detail_desc', 'product_type_name', 'product_group_name', 'department_name', 'colour_group_name']
     articles.drop(cols, axis=1, inplace=True)
 
-    # =============================================================================================
-    # Seasonal stuff
-    # =============================================================================================
+    # Below are some attempts at the seasonal feature engineering which didn't work out
 
-    # calculate the amount of times an article is bought per season
+    # Calculate the amount of times an article is bought per season
     fall = df[df["season"] == 0].groupby("article_id").size().reset_index(name="fall")
     # winter = df[df["season"] == 1].groupby("article_id").size().reset_index(name="winter")
     # spring = df[df["season"] == 2].groupby("article_id").size().reset_index(name="spring")
@@ -67,6 +66,13 @@ def articles_features(articles, df, name_components=8, description_components=8)
 
 
 def transactions_features(df):
+    """
+    Generate features for the transactions,
+    this adds a custom rank feature which is a small improvement but not much,
+    it also adds a season for other calculations later
+    :param df: the transactions but with a shorter name to make the code more readable
+    :return:
+    """
     counts = df.groupby('week')['article_id'].value_counts().rank(pct=True).reset_index(name='rank')
     counts["week"] += 1
     df = pd.merge(df, counts, on=['week', 'article_id'], how='left')
@@ -80,10 +86,20 @@ def transactions_features(df):
 
 
 def customers_features(customers):
+    """
+    This is probably the most complex feature engineering part, but I've managed to write it on a single line
+    :param customers: the customers
+    :return: the customers with the massively improved features
+    """
     return customers
 
 
 def all_features(test=False):
+    """
+    Generate all the features for the data, I usually comment out the stuff I need to rerun specific parts
+    :param test: whether to use a subset of the data for quick testing
+    :return: None
+    """
     transactions = pd.read_feather(path("transactions", 'sample' if test else 'full'))
     articles = pd.read_feather(path("articles", 'full'))
     customers = pd.read_feather(path("customers", 'full'))
@@ -98,7 +114,9 @@ def all_features(test=False):
 
 
 if __name__ == '__main__':
+    # Change pandas display settings to show more columns and rows
     pd.options.display.max_columns = None
     pd.options.display.width = None
     pd.options.display.max_rows = 50
+
     all_features()

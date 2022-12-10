@@ -12,6 +12,13 @@ def customer_id_to_int(x): return int(x[-16:], 16)
 
 
 def simplify_transactions(transactions):
+    """
+    Simplify the transaction dataset, this is the most important one.
+    We convert the article and customer ids to integers as weel as price to 32 bits and sales channel id to 8 bits.
+    From the datetime I only week the week number
+    :param transactions: the transactions
+    :return: None
+    """
     transactions.info(memory_usage='deep')
 
     transactions['customer_id'] = transactions['customer_id'].apply(customer_id_to_int).astype('int32')
@@ -34,6 +41,12 @@ def simplify_transactions(transactions):
 
 
 def simplify_customers(customers):
+    """
+    Simplify the customer dataset, we just convert stuff to smaller integer to save those precious bits
+    As described below, this does some additional preprocessing like filling in missing values with mean
+    :param customers: the customers
+    :return: None
+    """
     customers.info(memory_usage='deep')
 
     # FN / Active are mapped to i8 with values 0 and 1
@@ -55,6 +68,13 @@ def simplify_customers(customers):
 
 
 def simplify_articles(articles):
+    """
+    Simplify the article dataset, again reducing the size of the integers
+    and removing some text columns that are identical to other id columns.
+    This is a lossy operation, but I've found that the these textual columns have nothing to offer, even when embedded.
+    :param articles: the articles
+    :return: None
+    """
     articles.info(memory_usage='deep')
 
     # Everything that has weird indices, is factorized, similar to label encoding
@@ -78,6 +98,9 @@ def simplify_articles(articles):
 
 
 def simplify_full():
+    """
+    Simplify all the things! Or just some things if you want to do it in parts.
+    """
     datasets = ["transactions", "customers", "articles"]
     # datasets = ["articles"]
 
@@ -88,6 +111,9 @@ def simplify_full():
 
 
 def simplify_sample(frac=0.0001):
+    """
+    Create a sample of the data, this is useful for testing and debugging in other parts of the code
+    """
     datasets = ["transactions", "customers", "articles"]
     # datasets = ["articles"]
 

@@ -66,7 +66,7 @@ class EmbeddingCalculator(BatchProcess):
             - the user provided a keyword that couldn't be recognized by the subclass
         """
         print('python embeddings.py followed by:')
-        print('\t--model model_name (optional, default ResNet50)')
+        print('\t--model model_name (required)')
         print('\t--nr_rows_per_batch value (optional, default 1000)')
         exit()
 
@@ -74,9 +74,9 @@ class EmbeddingCalculator(BatchProcess):
         """
         Method to read and interpret the arguments provided by the user.
         This method may call the self.print_help method as described in the documentation of self.print_help.
-        The arguments should include:
-            - '--model' followed by a name of a pretrained model to be loaded from Keras
-            - '--nr_rows_per_batch' followed by the batch size (number of rows to be considered per batch)
+        The arguments may include:
+            - '--model' followed by a name of a pretrained model to be loaded from Keras (required)
+            - '--nr_rows_per_batch' followed by the batch size (number of rows to be considered per batch, default 1000)
         If 'help' is included in args or an unknown argument is found, self.print_help is called.
         The value of self.output_directory is based on the model name, and the image width and height.
         :param args: a list of arguments
@@ -84,6 +84,7 @@ class EmbeddingCalculator(BatchProcess):
         if 'help' in args:
             self.print_help()
 
+        self.nr_rows_per_batch = 1000
         for i, arg in enumerate(args):
             if arg == '--model':
                 self.model_name = arguments[i + 1]
@@ -95,6 +96,7 @@ class EmbeddingCalculator(BatchProcess):
                 print(f'Unknown argument {arg}, expected:')
                 self.print_help()
 
+        # given the arguments, we can define an output directory related to the input parameters
         self.output_directory = f'embeddings_{self.model_name}_W{self.img_width}_H{self.img_height}'
 
     def can_run(self):

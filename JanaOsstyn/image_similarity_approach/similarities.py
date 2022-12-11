@@ -68,13 +68,19 @@ class SimilarityCalculator(BatchProcess):
 
     def read_arguments(self, args):
         """
-        Function to read the arguments provided by the user. Sets the values of self.nr_rows and
-        self.nr_rows_per_batch (and thus of self.nr_batches).
-        May call print_help if 'help' in args, or if one of the arguments was not understood.
+        Method to read and interpret the arguments provided by the user.
+        This method may call the self.print_help method as described in the documentation of self.print_help.
+        The arguments may include:
+            - '--embedding_version' followed by the name of a directory containing an embeddings.feather file (required)
+            - '--nr_rows_per_batch' followed by the batch size (number of rows to be considered per batch, default 1000)
+        If 'help' is included in args or an unknown argument is found, self.print_help is called.
+        The value of self.output_directory is based on the model name, and the image width and height.
+        :param args: a list of arguments
         """
         if 'help' in args:
             self.print_help()
 
+        self.nr_rows_per_batch = 1000  # default
         for i, arg in enumerate(arguments):
             if arg == '--embedding_version':
                 self.embedding_version = arguments[i + 1]
@@ -86,6 +92,7 @@ class SimilarityCalculator(BatchProcess):
                 print(f'Unknown argument {arg}, expected:')
                 self.print_help()
 
+        # given the arguments, we can now extract useful entities
         self.embedding_df = pd.read_feather(odp(filename=f'embeddings/{self.embedding_version}/embeddings.feather'))
         self.nr_rows = self.embedding_df.shape[0]
         self.output_directory = self.embedding_version.replace('embeddings', 'similarities')

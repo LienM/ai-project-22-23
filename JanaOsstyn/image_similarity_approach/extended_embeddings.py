@@ -57,15 +57,17 @@ class ExtendedEmbeddingCalculator(BatchProcess):
         """
         Method to read and interpret the arguments provided by the user.
         This method may call the self.print_help method as described in the documentation of self.print_help.
-        The arguments should include:
+        The arguments may include:
             - '--nr_rows_per_batch' followed by the batch size (number of rows to be considered per batch)
         If 'help' is included in args or an unknown argument is found, self.print_help is called.
-        The value of self.output_directory is based on the model name, and the image width and height.
+        The value of self.output_directory is not relevant for this class as the output is based on existing directories
+        with embeddings.
         :param args: a list of arguments
         """
         if 'help' in args:
             self.print_help()
 
+        self.nr_rows_per_batch = 1000
         for i, arg in enumerate(args):
             if arg == '--nr_rows_per_batch':
                 self.nr_rows_per_batch = int(arguments[i + 1])
@@ -74,6 +76,9 @@ class ExtendedEmbeddingCalculator(BatchProcess):
             else:
                 print(f'Unknown argument {arg}, expected:')
                 self.print_help()
+
+        # not relevant
+        self.output_directory = ''
 
     def can_run(self):
         """

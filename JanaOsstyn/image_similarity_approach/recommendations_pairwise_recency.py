@@ -57,7 +57,7 @@ class RecencyPairwiseRecommender(BatchProcess):
             - the user passed 'help' as one of the arguments
             - the user provided a keyword that couldn't be recognized by the subclass
         """
-        print('python embeddings.py followed by:')
+        print('python recommendations_pairwise_recency.py followed by:')
         print('\t--similarity_version value (required)')
         print('\t--sim_level value (optional, default 1)')
         print('\t--nr_rows_per_batch value (optional, default 10000)')

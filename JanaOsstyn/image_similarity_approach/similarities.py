@@ -17,7 +17,7 @@ class SimilarityCalculator(BatchProcess):
     Subclass of BatchProcess.
     Allows similarity calculation in batches of rows.
     Only the 250 most similar articles are kept for each article, as storing them all cannot be handled in a single
-    dataframe which makes lookup in a later phase more difficult than needed.
+    dataframe which makes similarity_lookup in a later phase more difficult than needed.
     """
 
     # ------------------------------------------------------------------------------------------------------------------

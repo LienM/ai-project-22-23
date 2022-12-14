@@ -1,10 +1,5 @@
-import os
-
-from batch_process import BatchProcess
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import sys
-
+from batch_process import BatchProcess
 from functions import *
 
 
@@ -12,12 +7,23 @@ class RecencyMixedRecommender(BatchProcess):
     """
     Subclass of BatchProcess.
     Predict articles for each customer.
-    The X most recent purchases are extracted for each customer. Then, for each of these, the Y most similar articles
-    are collected as candidates. The 12 most popular articles among people with approximately the same age are added as
-    candidates too (see preprocessing.ipynb for a definition of this). Then, for each of the candidates, the
-    similarities to each of the X purchased articles are fetched from a dataframe with similarities. However, this
-    dataframe only stores the 250 most similar items, which means it is possible for a candidate to have no similarity
-    value with respect to a certain purchase. In this case, 0.5 is stored.
+    The 12 most recent purchases are extracted for each customer. Then, for the Y most recent purchased articles, the
+    most similar article is collected. The 12 - Y remaining spots for recommendations are filled with the most popular
+    items among customers within the same age category (see preprocessing.ipynb for a definition of this).
+
+    Note: the purpose of this class was originally more complex. Instead of the 12 most recent articles, the X most
+    recent articles were fetched, after which for each of these the Y most similar articles were collected. The 12 most
+    popular articles among people with approximately the same age were added as candidates too. Then, for each of the
+    candidates, the similarities to each of the X purchased articles were fetched from a dataframe with similarities.
+    However, this dataframe only stores the 250 most similar items, which means it was possible for a candidate to have
+    no similarity value with respect to a certain purchase. In this case, 0.5 was stored. From this point, the goal was
+    to sort the similarities and return the 12 articles that were, in total, most similar to all X purchased items.
+    This seemed to work very well (> 0.004, +-double of just pairwise recency) but accidentally it came out that the
+    similarity shortcut dictionary that was built hadn't the right keys, meaning all similarities were 0.5 at sorting
+    time. Pandas performed Quicksort and thus modified the array slightly. From this it came out it gave me the > 0.004
+    scores just because he took the 2 recommendations for the last 2 purchases and 10 of the most popular baseline.
+    After fixing this, the score dropped to 0.002, which made me throw away the fancy sorting idea as it performed worse
+    than the much simpler idea of mixing recency with popularity.
     """
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -33,11 +39,9 @@ class RecencyMixedRecommender(BatchProcess):
 
         # SIMILARITIES
         self.num_similar = None                         # how many similar values to take for each purchased article
-        self.num_recent = None                          # how many purchased articles to consider
         self.similarity_version = None                  # similarity version (relates to embedding version)
         self.similarity_value_df = None                 # a dataframe holding the similarity values
         self.similarity_ids_df = None                   # a dataframe holding the corresponding article ids
-        self.similarity_lookup = None                   # a dictionary with a more compressed similarity value lookup
 
         # TRANSACTIONS
         cold_start_df = pd.read_feather(odp(filename='cold_start_recommendations.feather'))
@@ -52,13 +56,12 @@ class RecencyMixedRecommender(BatchProcess):
         # ARTICLES
         article_df = pd.read_feather(idp(filename='articles_processed.feather'))
         # a list of article_ids for which no image exists
-        self.no_img = article_df[article_df['image_name'] == 'does not exist']['article_id'].values.tolist()
+        self.no_img_articles = article_df[article_df['image_name'] == 'does not exist']['article_id'].values.tolist()
 
         # other
         self.base_filenames = ['mixed_prediction']      # names for final and temporary files
 
         self.read_arguments(args)                       # read the arguments
-        self.create_lookup_dictionary()                 # create the lookup dictionary
 
     # ------------------------------------------------------------------------------------------------------------------
     # helper methods
@@ -73,7 +76,6 @@ class RecencyMixedRecommender(BatchProcess):
         """
         print('python recommendations_mixed_recency.py followed by:')
         print('\t--similarity_version value (required)')
-        print('\t--num_recent value (optional, default 12)')
         print('\t--num_similar value (optional, default 3)')
         print('\t--nr_rows_per_batch value (optional, default 10000)')
         exit()
@@ -84,7 +86,6 @@ class RecencyMixedRecommender(BatchProcess):
         This method may call the self.print_help method as described in the documentation of self.print_help.
         The arguments should include:
             - '--similarity_version' followed by the name of a directory containing similarity feather files (required)
-            - '--num_recent' followed by an int, indicates how many files from purchase history to take for prediction
             - '--num_similar' followed by an int, indicates how many candidates per purchase
             - '--nr_rows_per_batch' followed by the batch size (number of rows to be considered per batch)
         If 'help' is included in args or an unknown argument is found, self.print_help is called.
@@ -97,8 +98,6 @@ class RecencyMixedRecommender(BatchProcess):
         for i, arg in enumerate(args):
             if arg == '--num_similar':
                 self.num_similar = int(arguments[i + 1])
-            elif arg == '--num_recent':
-                self.num_recent = int(arguments[i + 1])
             elif arg == '--nr_rows_per_batch':
                 self.nr_rows_per_batch = int(arguments[i + 1])
             elif arg == '--similarity_version':
@@ -112,14 +111,16 @@ class RecencyMixedRecommender(BatchProcess):
         # now that the similarity version is known, the similarity dataframes can be loaded
         self.similarity_ids_df = pd.read_feather(
             odp(f'similarities/{self.similarity_version}/similarities_ids.feather')
-        ).set_index(self.similarity_ids_df['article_id'])
+        )
+        self.similarity_ids_df = self.similarity_ids_df.set_index(self.similarity_ids_df['article_id'])
         self.similarity_value_df = pd.read_feather(
             odp(f'similarities/{self.similarity_version}/similarities_values.feather')
-        ).set_index(self.similarity_value_df['article_id'])
+        )
+        self.similarity_value_df = self.similarity_value_df.set_index(self.similarity_value_df['article_id'])
 
         # also, the output directory can now be defined
         self.output_directory = f"{self.modulename}_{self.similarity_version.replace('similarities_', '')}_" \
-                                f"num_{self.num_similar}_hist_{self.num_recent}"
+                                f"num_{self.num_similar}"
 
     def can_run(self):
         """
@@ -129,30 +130,9 @@ class RecencyMixedRecommender(BatchProcess):
         """
         return \
             self.num_similar is not None and \
-            self.num_recent is not None and \
             self.similarity_version is not None and \
             self.similarity_value_df is not None and \
-            self.similarity_ids_df is not None and \
-            self.similarity_lookup is not None
-
-    def create_lookup_dictionary(self):
-        """
-        Create a lookup dictionary which stores the similarity between two articles by concatenating their ids such that
-        the 'smallest' one is before the other in the concatenation. This way, only half of the values is stored for
-        the same result, as sim(i, j) = sim(j, i), thus storing 'i j' --> sim is enough.
-        """
-        self.similarity_lookup = dict()
-        index = self.similarity_ids_df.index.values.tolist()
-        for column in range(250):
-            column_zip = list(zip(
-                [index, self.similarity_ids_df[str(column)].values.tolist()],   # pairs of article_ids
-                self.similarity_value_df[str(column)].values.tolist()           # their similarity value
-            ))
-            new_lookup_dict = {
-                ' '.join(sorted(article_ids)): similarity   # create key
-                for article_ids, similarity in column_zip
-            }
-            self.similarity_lookup.update(new_lookup_dict)
+            self.similarity_ids_df is not None
 
     def run(self):
         """
@@ -170,13 +150,13 @@ class RecencyMixedRecommender(BatchProcess):
         feather_submission = pd.read_feather(
             self.specified_odp(
                 filename=f'{self.modulename}_{self.similarity_version.replace("similarities_", "")}_'
-                         f'num_{self.num_similar}_hist_{self.num_recent}/mixed_prediction.feather'
+                         f'num_{self.num_similar}/mixed_prediction.feather'
             )
         )
         feather_submission.to_csv(
             self.specified_odp(
                 filename=f'{self.modulename}_{self.similarity_version.replace("similarities_", "")}_'
-                         f'num_{self.num_similar}_hist_{self.num_recent}/mixed_prediction.csv'
+                         f'num_{self.num_similar}/mixed_prediction.csv'
             ),
             index=False
         )
@@ -185,7 +165,7 @@ class RecencyMixedRecommender(BatchProcess):
         check_submission(
             filename=self.specified_odp(
                 filename=f'{self.modulename}_{self.similarity_version.replace("similarities_", "")}_'
-                         f'num_{self.num_similar}_hist_{self.num_recent}/mixed_prediction.csv'
+                         f'num_{self.num_similar}/mixed_prediction.csv'
             ),
             nr_customers=self.nr_rows
         )
@@ -193,12 +173,11 @@ class RecencyMixedRecommender(BatchProcess):
         # write a small description txt file
         file = open(self.specified_odp(
             filename=f'{self.modulename}_{self.similarity_version.replace("similarities_", "")}'
-                     f'_num_{self.num_similar}_hist_{self.num_recent}'
+                     f'_num_{self.num_similar}'
                      f'/description.txt'
         ), 'w')
         file.write(f'Similarities: {self.similarity_version}\n')
         file.write(f'Number of similar items / history item: {self.num_similar}\n')
-        file.write(f'Number of history items used / prediction: {self.num_recent}\n')
         file.write(f'Method: recency/mixed')
         file.close()
 
@@ -213,11 +192,11 @@ class RecencyMixedRecommender(BatchProcess):
 
         # remove all duplicates and all article_ids that are not linked to an image
         customer_purchase_hist = list(dict.fromkeys([
-            c for c in article_str_to_list(article_id_str=customer_purchase_hist) if c not in self.no_img
+            c for c in article_str_to_list(article_id_str=customer_purchase_hist) if c not in self.no_img_articles
         ]))
 
-        # truncate such that only the self.num_recent last purchased articles are left
-        customer_purchase_hist = customer_purchase_hist[:self.num_recent]
+        # truncate such that only the self.num_similar last purchased articles are left
+        customer_purchase_hist = customer_purchase_hist[:self.num_similar]
 
         # remove all '' (if empty history, '' can be in customer_purchase_hist)
         customer_purchase_hist = [x for x in customer_purchase_hist if len(x) > 0]
@@ -225,34 +204,13 @@ class RecencyMixedRecommender(BatchProcess):
             # now, if the history is empty, just return the default recommendations (popularity/age based)
             return customer_default
 
-        # create a candidate list
         most_similar_article_ids = [
-            self.similarity_ids_df.loc[article_id].values.tolist()[2:self.num_similar + 2]
+            self.similarity_ids_df.loc[article_id, '1']
             for article_id in customer_purchase_hist
-        ]
-        candidate_list = [list(x) for x in zip(*most_similar_article_ids)]
-        flattened_candidate_list = list(set(np.array(candidate_list).flatten().tolist()))
-        flattened_candidate_list.extend(article_str_to_list(customer_default))
-
-        # now use self.similarity_lookup to find the similarity of each candidate-article pair
-        # use 0.5 if this pair is not in the lookup dictionary
-        candidates_with_similarities = []
-        for candidate in flattened_candidate_list:
-            for article in customer_purchase_hist:
-                key = candidate + ' ' + article if candidate < article else article + ' ' + candidate
-                if key in self.similarity_lookup:
-                    candidates_with_similarities.append((candidate, self.similarity_lookup[key][0]))
-                else:
-                    candidates_with_similarities.append((candidate, 0.5))
-
-        # put everything in a dataframe, allowing to group by candidate and sum up all similarities
-        result_df = pd.DataFrame(candidates_with_similarities)
-        result_df.columns = ['candidate', 'similarity']
-        result_df = result_df.groupby('candidate').sum()
-        result_df = result_df.sort_values(by='similarity', ascending=False)
+        ] + article_str_to_list(customer_default)
 
         # return the 12 most similar articles
-        return article_list_to_str(result_df.index.values.tolist()[:12])
+        return article_list_to_str(most_similar_article_ids[:12])
 
     def batch_function(self, min_row_ind, batch_nr):
         """
@@ -281,27 +239,11 @@ class RecencyMixedRecommender(BatchProcess):
 
 
 if __name__ == '__main__':
+    """
+    usage: e.g. "python recommendations_mixed_recency.py --similarity_version similarities_ResNet50_W128_H128 
+                --nr_rows_per_batch 10000 --num_similar 3"
+    """
     arguments = sys.argv[1:]
 
-    # model_names = [
-    #     'ResNet50', 'ResNet50V2', 'ResNet101', 'ResNet101V2', 'ResNet152', 'ResNet152V2', 'InceptionV3',
-    #     'InceptionResNetV2', 'VGG16', 'VGG19', 'Xception'
-    # ]
-    model_names = [
-        'ResNet152', 'ResNet152V2', 'InceptionV3',
-        'InceptionResNetV2', 'VGG16', 'VGG19', 'Xception'
-    ]
-
-    for x in ['extended_']:
-        for k, model_name in enumerate(model_names):
-
-            print(f'{(k + 1)}/{len(model_names) * 2}', model_name)
-            arguments = [
-                '--similarity_version', f'{x}similarities_{model_name}_W128_H128',
-                '--nr_rows_per_batch', '10000',
-                '--num_similar', '2',
-                '--num_recent', '12'
-            ]
-
-            submission_calculator = RecencyMixedRecommender(arguments)
-            submission_calculator.run()
+    submission_calculator = RecencyMixedRecommender(arguments)
+    submission_calculator.run()

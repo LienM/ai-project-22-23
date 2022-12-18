@@ -15,7 +15,7 @@ def rank(data, verbose=True, n_estimators=100):
     :return:
     """
     use_val = False
-    ranker_type = "classifier"
+    ranker_type = "ranker"
 
     test_week = data['test_week']
     samples = data['samples']

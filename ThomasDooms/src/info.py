@@ -1,9 +1,3 @@
-# ============================================================================
-# @author      : Thomas Dooms
-# @date        : 14/11/22
-# @copyright   : MA2 Computer Science - Thomas Dooms - University of Antwerp
-# ============================================================================
-
 import pandas as pd
 
 BASE = "data"

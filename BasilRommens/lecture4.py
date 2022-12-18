@@ -115,7 +115,7 @@ def predict_topn(X_reduced, model):
 
 def get_group_sizes(dataset):
     group_sizes = dataset.groupby(['week', 'customer_id'])[
-        'article_id'].count().values
+        'product_type_no'].count().values
     return group_sizes
 
 
@@ -334,7 +334,7 @@ def age_bin_candidates(transactions, test_week, bin_size=1, intervals=None,
                                 inplace=True)
 
     # TEST WEEK CANINATES
-    # remove duplicate customer ids in unique customerid transactions
+    # remove duplicate customer ids in unique customer id transactions
     test_set_transactions = unique_transactions.drop_duplicates(
         'customer_id').reset_index(drop=True)
     # set the test week for all the customers
@@ -504,7 +504,7 @@ def get_bestseller_dict(age_bestsellers_previous_week, transactions, last_week):
         new_age_bin_bestsellers = []
         for age_bin_bestseller in age_bin_bestsellers:
             if type(age_bin_bestseller) == list:
-                new_age_bin_bestsellers.append(age_bin_bestseller)
+                new_age_bin_bestsellers.append(list(set(age_bin_bestseller)))
             else:
                 new_age_bin_bestsellers.append([age_bin_bestseller])
 
@@ -519,6 +519,23 @@ def get_cid_2_preds(test):
         .sort_values(['customer_id', 'preds'], ascending=False) \
         .groupby('customer_id')['article_id'].apply(list).to_dict()
 
+def get_cid_2_preds_prod(test):
+    cid_2_preds_prod = test \
+        .sort_values(['customer_id', 'preds'], ascending=False) \
+        .groupby('customer_id')['product_type_no'].apply(list).to_dict()
+    # set index for fast article id finding
+    test = test.set_index('product_type_no')
+
+    # find the associated products for each product type
+    cid_2_preds = dict()
+    for cid, prods in cid_2_preds_prod.items():
+        article_ids = list()
+        for prod in prods:
+            article_ids.extend(get_articles_of_product_type(test, prod))
+        cid_2_preds[cid] = article_ids[:12]
+
+    return cid_2_preds
+
 
 def get_cid_2_age_bin(transactions):
     return transactions.groupby('customer_id')['age_bin'] \
@@ -532,7 +549,8 @@ def make_and_write_predictions_age(model, test, X_test,
                                    sub_name):
     # get the predictions and convert to dict
     test['preds'] = model.predict(X_test)
-    c_id2predicted_article_ids = get_cid_2_preds(test)
+    # c_id_2_predicted_article_ids = get_cid_2_preds(test)
+    c_id_2_predicted_article_ids = get_cid_2_preds_prod(test)
 
     # get the bestsellers for each age bin and convert to a dict
     bestsellers_age_bin_dict = get_bestseller_dict(
@@ -555,7 +573,7 @@ def make_and_write_predictions_age(model, test, X_test,
             customer_age_bin = cid_2_age_bin.get(customer_id, -1)
 
         # return the customer specific predictions
-        pred = c_id2predicted_article_ids.get(customer_id, [])
+        pred = c_id_2_predicted_article_ids.get(customer_id, [])
         # get the bestsellers of the age bin
         bestsellers_age_bin = bestsellers_age_bin_dict.get(customer_age_bin, [])
 
@@ -655,8 +673,7 @@ def age_smarter_bins():
         transactions = pd.merge(
             transactions,
             age_bestsellers_previous_week[
-                ['week', 'age_bin', 'product_type_no',
-                 'age_bestseller_rank']],
+                ['week', 'age_bin', 'product_type_no', 'age_bestseller_rank']],
             on=['week', 'age_bin', 'product_type_no'],
             how='left'
         )
@@ -678,7 +695,7 @@ def age_smarter_bins():
         # create the test week
         test = transactions[transactions.week == test_week] \
             .drop_duplicates(
-            ['customer_id', 'product_type_no', 'sales_channel_id']) \
+            ['customer_id', 'article_id', 'sales_channel_id']) \
             .copy()
 
         # construct a suitable X and y (where y indicates ordered or not)
@@ -710,7 +727,7 @@ def age_simple_bin():
         for bin_size in [1, 2, 3, 4, 8, 16, 32, 64]:
             print(last_week, bin_size)
             articles, customers, transactions = read_data_set('feather')
-            # articles, customers, transactions = part_data_set('01')
+            # articles, customers, transactions = part_data_set('5')
 
             # encode and decode customer ids
             customer_encoder = joblib.load('../data/customer_encoder.joblib')
@@ -744,12 +761,12 @@ def age_simple_bin():
                                    intervals=intervals)
 
             # add the non-ordered items
-            transactions = pd.concat(
-                [transactions, candidates_age_bin])
+            transactions = pd.concat([transactions, candidates_age_bin])
             transactions['ordered'] = transactions['ordered'].fillna(0)
 
             transactions = transactions.drop_duplicates(
-                subset=['customer_id', 'product_type_no', 'week'], keep=False)
+                subset=['customer_id', 'product_type_no', 'week', 'age_bin'],
+                keep=False)
 
             transactions['ordered'] = transactions['ordered'].astype(np.uint8)
 
@@ -780,7 +797,7 @@ def age_simple_bin():
             # create the test week
             test = transactions[transactions.week == test_week] \
                 .drop_duplicates(
-                ['customer_id', 'product_type_no', 'sales_channel_id']) \
+                ['customer_id', 'article_id', 'age_bin', 'sales_channel_id']) \
                 .copy()
 
             # construct a suitable X and y (where y indicates ordered or not)
@@ -922,10 +939,11 @@ def just_popularity():
 
 
 if __name__ == '__main__':
-    age_smarter_bins()
-    # age_simple_bin()
-    # just_popularity()
     # prepare_feather_datasets()
+    # age_smarter_bins()
+    age_simple_bin()
+    # just_popularity()
+
     # for last_week in [106, 105, 104, 103, 102]:
     #     for bin_size in [1, 2, 3, 4, 8, 16, 32, 64]:
     #         print(last_week, bin_size)

@@ -214,7 +214,8 @@ def change_age_explore():
     # TODO: if time change to stacked barplot for better view where the -1s went
     # age histplot before transformation
     ages = transactions['age'].tolist()
-    sns.histplot(ages, binwidth=1)
+    ax = sns.histplot(ages, binwidth=1)
+    ax.patches[0].set_facecolor('salmon')
     plt.show()
     print(min(ages), max(ages))
     # change all the -1 ages to the most similar age using purchases
@@ -225,6 +226,35 @@ def change_age_explore():
     print(min(ages), max(ages))
 
 
+def same_day_purchase():
+    articles, customers, transactions = read_data_set('feather')
+    # articles, customers, transactions = part_data_set('01')
+
+    articles, customers, transactions = get_relevant_cols(articles, customers,
+                                                          transactions,
+                                                          ['t_dat'])
+
+    # combine the transactions dataframe with all the articles
+    transactions = merge_transactions(transactions, articles, customers)
+    del articles
+
+    # get the number of purchases per day per customer id
+    nr_purchases = transactions.groupby(['customer_id', 't_dat'])[
+        't_dat'].count().values
+
+    # histogram of nr of purchases per day
+    sns.histplot(nr_purchases, binwidth=1)
+    plt.yscale('log')
+    plt.show()
+    # histogram of nr of purchase per day with bin where first bar is where only
+    # one purchase was made
+    nr_purchases_diff = list(map(lambda x: x != 1, nr_purchases))
+    ax = sns.histplot(nr_purchases_diff, bins=2)
+    ax.patches[0].set_facecolor('salmon')
+    plt.show()
+
+
 if __name__ == '__main__':
     # explore_rq1()
     change_age_explore()
+    # same_day_purchase()

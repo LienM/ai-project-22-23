@@ -21,7 +21,7 @@ def write_dict(c_candidates, f_name):
     # encode and decode customer ids
     customer_encoder = joblib.load('../data/customer_encoder.joblib')
 
-    for c_id, c_cand in tqdm(c_candidates.items()):
+    for c_id, c_cand in c_candidates.items():
         c_ids.append(c_id)
         candidate_str.append(' '.join(['0' + str(cand) for cand in c_cand]))
 
@@ -88,7 +88,7 @@ def get_graph_embedding_candidates(n, embedding_fname):
               for idx, a_id in enumerate(articles['article_id'].values)}
 
     c_candidates = dict()
-    for c_id in tqdm(customers['customer_id'].values):
+    for c_id in customers['customer_id'].values:
         # get map, customer id and its embedding
         mc_id = c_map[c_id]
         c_emb = embedding[mc_id]
@@ -103,13 +103,63 @@ def get_graph_embedding_candidates(n, embedding_fname):
     return c_candidates
 
 
-if __name__ == '__main__':
-    for last_week in tqdm([104]):
-        for n_weeks in tqdm([3]):
-            # sub_name = f'graph_embeddings_week_{last_week}_nr_{n_weeks}.csv.gz'
+def graph_submission():
+    for last_week in tqdm(range(106, 101, -1)):
+        for n_weeks in tqdm([40, 20, 10, 5, 3, 2, 1]):
+            sub_name = f'embedding_week_{last_week}_nr_{n_weeks}'
+            c_candidates = get_graph_embedding_candidates(12,
+                                                          f'../data/{sub_name}.npy')
+
+            # write the predictions
+            write_dict(c_candidates, f'../out/{sub_name}.csv.gz')
+
+
+def graph_temporal_submission():
+    for last_week in tqdm(range(106, 101, -1)):
+        for n_weeks in tqdm([10, 5, 3, 2, 1]):
             sub_name = f'embedding_week_{last_week}_nr_{n_weeks}_temporal'
             c_candidates = get_graph_embedding_candidates_temporal(12,
                                                                    f'../data/{sub_name}.npy')
 
             # write the predictions
             write_dict(c_candidates, f'../out/{sub_name}.csv.gz')
+
+
+def graph_temporal_improved_submission():
+    for n_weeks in tqdm([10, 5, 3, 2, 1]):
+        sub_name = f'embedding_week_106_nr_{n_weeks}_temporal_improved'
+        c_candidates = get_graph_embedding_candidates_temporal(12,
+                                                               f'../data/{sub_name}.npy')
+
+        # write the predictions
+        write_dict(c_candidates, f'../out/{sub_name}.csv.gz')
+
+
+def graph_walk_nr_submission():
+    for n_weeks in tqdm([5, 3, 2, 1]):
+        for walk_nr in [5, 3, 2, 1]:
+            sub_name = f'embedding_week_106_nr_{n_weeks}_walk_nr_{walk_nr}'
+            c_candidates = get_graph_embedding_candidates(12,
+                                                          f'../data/{sub_name}.npy')
+
+            # write the predictions
+            write_dict(c_candidates, f'../out/{sub_name}.csv.gz')
+
+
+def graph_walk_len_submission():
+    for n_weeks in tqdm([5, 3, 2, 1]):
+        for walk_len in [15, 10, 8, 5, 3, 2, 1]:
+            sub_name = f'embedding_week_106_nr_{n_weeks}_walk_len_{walk_len}'
+            c_candidates = get_graph_embedding_candidates(12,
+                                                          f'../data/{sub_name}.npy')
+
+            # write the predictions
+            write_dict(c_candidates, f'../out/{sub_name}.csv.gz')
+
+
+if __name__ == '__main__':
+    # graph_submission()
+    # graph_temporal_submission()
+    # graph_temporal_improved_submission()
+    graph_walk_nr_submission()
+    graph_walk_len_submission()

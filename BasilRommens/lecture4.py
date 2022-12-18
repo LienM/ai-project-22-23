@@ -207,9 +207,9 @@ def last_purchase_candidates(transactions):
 
 
 def get_age_interval_idx(age, *intervals):
-    if type(intervals[0]) != list:
+    if type(intervals[0][0]) != list:
         intervals = [intervals]
-    for interval_idx, interval in enumerate(intervals):
+    for interval_idx, interval in enumerate(intervals[0]):
         if interval[0] <= age <= interval[1]:
             return interval_idx
 
@@ -243,7 +243,7 @@ def compare_rankings(ranking_1, ranking_2):
     return sim
 
 
-def smart_merge_intervals(transactions):
+def smart_merge_intervals(transactions, threshold=100):
     count = transactions \
         .groupby('age')['product_type_no'].value_counts() \
         .rename('count') \
@@ -275,9 +275,9 @@ def smart_merge_intervals(transactions):
             intervals.append(cur_interval.copy())
             cur_interval.clear()
             cur_interval.append(age)
-    sims = sorted(sims)
-    sns.histplot(x=sims)
-    plt.show()
+    # sims = sorted(sims)
+    # sns.histplot(x=sims)
+    # plt.show()
 
     correct_intervals = list()
     for interval in intervals:
@@ -286,15 +286,30 @@ def smart_merge_intervals(transactions):
     return correct_intervals
 
 
-def age_bin_candidates(transactions, test_week, bin_size=1, intervals=None):
+def age_bin_candidates(transactions, test_week, bin_size=1, intervals=None,
+                       threshold=100):
     # add bin size to the age column
     if intervals is None:  # use bin size if no intervals are given
         transactions['age_bin'] = transactions['age'] // bin_size
+    elif intervals == 'smart':  # use smart interval algorithm
+        transactions['age_bin'] = transactions['age']
+        new_transactions = pd.DataFrame()
+        for week in transactions['week'].unique():
+            weekly_transactions = transactions[transactions['week'] == week]
+            intervals = smart_merge_intervals(weekly_transactions, threshold)
+            weekly_transactions['age_bin'] = \
+                weekly_transactions['age_bin'] \
+                    .apply(get_age_interval_idx, args=(intervals,))
+            new_transactions = pd.concat(
+                [new_transactions, weekly_transactions])
+        transactions = new_transactions
+        del new_transactions
     else:  # use intervals if they are given
         transactions['age_bin'] = transactions['age']
-        transactions['age_bin'] = transactions['age_bin'] \
-            .apply(get_age_interval_idx, args=(intervals))
+        transactions['age_bin'] = transactions[['age_bin', 'week']] \
+            .apply(get_age_interval_idx, args=(intervals,))
     transactions['age_bin'].astype(np.uint8)
+
     # TRAINING WEEK CANINATES
     # group the articles by week and get the counts, take top 12 candidates and
     # add a rank
@@ -317,6 +332,7 @@ def age_bin_candidates(transactions, test_week, bin_size=1, intervals=None):
     )
     candidates_bestsellers.drop(columns=['age_bestseller_rank', 'ordered'],
                                 inplace=True)
+
     # TEST WEEK CANINATES
     # remove duplicate customer ids in unique customerid transactions
     test_set_transactions = unique_transactions.drop_duplicates(
@@ -410,7 +426,10 @@ def merge_transactions(transactions, articles, customers):
 
 
 def get_articles_of_product_type(transactions, product_type_no):
-    products = transactions.loc[product_type_no]
+    try:
+        products = transactions.loc[product_type_no]
+    except KeyError:
+        return []
     return products['article_id'].tolist()
 
 
@@ -490,7 +509,7 @@ def get_bestseller_dict(age_bestsellers_previous_week, transactions, last_week):
                 new_age_bin_bestsellers.append([age_bin_bestseller])
 
         bestsellers_age_bin_dict[age_bin] = \
-            list(itertools.chain(*new_age_bin_bestsellers))[:20]
+            list(itertools.chain(*new_age_bin_bestsellers))[:12]
 
     return bestsellers_age_bin_dict
 
@@ -584,6 +603,106 @@ def make_and_write_predictions(model, test, X_test, bestsellers_last_week,
     sub['prediction'] = preds
     # name and write the predictions
     sub.to_csv(f'../out/{sub_name}.csv.gz', index=False)
+
+
+def age_smarter_bins():
+    for smart_threshold in range(10, 200, 20):
+        print(f'age smarter bins with threshold {smart_threshold}')
+        articles, customers, transactions = read_data_set('feather')
+        # articles, customers, transactions = part_data_set('01')
+
+        # encode and decode customer ids
+        customer_encoder = joblib.load('../data/customer_encoder.joblib')
+
+        articles, customers, transactions = get_relevant_cols(articles,
+                                                              customers,
+                                                              transactions)
+
+        last_week = 106
+        test_week = last_week + 1
+
+        # get transactions in the last n weeks
+        transactions = last_n_week_transactions(transactions, last_week, 10)
+
+        # label the ordered columns
+        transactions['ordered'] = 1
+
+        # combine the transactions dataframe with all the articles
+        transactions = merge_transactions(transactions, articles, customers)
+        del articles
+
+        # change all the -1 ages to the most similar age using purchases
+        transactions = change_age(transactions)
+
+        # from here all the code has been used from unless marked otherwise
+        # https://github.com/radekosmulski/personalized_fashion_recs/blob/main/03c_Basic_Model_Submission.ipynb
+        # get the candidates last purchase
+        # OWN: get the candidates age bin
+        intervals = 'smart'
+        candidates_age_bin, age_bestsellers_previous_week = \
+            age_bin_candidates(transactions, test_week, intervals=intervals)
+
+        # add the non-ordered items
+        transactions = pd.concat([transactions, candidates_age_bin])
+        transactions['ordered'] = transactions['ordered'].fillna(0)
+
+        transactions = transactions.drop_duplicates(
+            subset=['customer_id', 'product_type_no', 'week'], keep=False)
+
+        transactions['ordered'] = transactions['ordered'].astype(np.uint8)
+
+        # merge the previous week bestsellers to transactions as it adds the rank
+        transactions = pd.merge(
+            transactions,
+            age_bestsellers_previous_week[
+                ['week', 'age_bin', 'product_type_no',
+                 'age_bestseller_rank']],
+            on=['week', 'age_bin', 'product_type_no'],
+            how='left'
+        )
+
+        # take only the transactions which aren't in the first week
+        transactions = transactions[
+            transactions['week'] != transactions['week'].min()]
+
+        # change the values for the non-bestsellers to 999
+        transactions['age_bestseller_rank'].fillna(999, inplace=True)
+
+        # sort the transactions by week and customer_id
+        transactions = transactions \
+            .sort_values(['week', 'customer_id']) \
+            .reset_index(drop=True)
+
+        # take the training set as the transactions not happening in the test week
+        train = transactions[transactions.week != test_week]
+        # create the test week
+        test = transactions[transactions.week == test_week] \
+            .drop_duplicates(
+            ['customer_id', 'product_type_no', 'sales_channel_id']) \
+            .copy()
+
+        # construct a suitable X and y (where y indicates ordered or not)
+        X_train, y_train, = construct_X_y(train, usable_cols)
+        X_test, _ = construct_X_y(test, usable_cols)
+
+        # create a model
+        group_sizes = get_group_sizes(train)
+        model = lgb.LGBMRanker(objective='lambdarank',
+                               metric='ndcg',
+                               n_estimators=100,
+                               importance_type='gain',
+                               force_row_wise=True)
+        model = model.fit(X=X_train, y=y_train, group=group_sizes)
+
+        # show feature importances
+        show_feature_importances(model)
+
+        # make and write predictions
+        sub_name = f'age_bin_prod_week_{last_week}_smart_threshold_{smart_threshold}'
+        make_and_write_predictions_age(model, test, X_test,
+                                       age_bestsellers_previous_week,
+                                       customers, customer_encoder,
+                                       transactions, last_week, sub_name)
 
 
 def age_simple_bin():
@@ -803,7 +922,8 @@ def just_popularity():
 
 
 if __name__ == '__main__':
-    age_simple_bin()
+    age_smarter_bins()
+    # age_simple_bin()
     # just_popularity()
     # prepare_feather_datasets()
     # for last_week in [106, 105, 104, 103, 102]:

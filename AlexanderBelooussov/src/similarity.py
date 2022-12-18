@@ -3,6 +3,8 @@ from multiprocessing import Pool
 from utils import *
 from sklearn.metrics.pairwise import cosine_similarity
 
+from utils import concat_downcast
+
 
 def l0_similarity(articles, transactions):
     """
@@ -56,7 +58,7 @@ def w2v_similarity(articles, transactions):
 #                          })
 
 
-def get_similar_items(articles, transactions, n, sim_type, last_week_customers_only=False):
+def get_similar_items(articles, transactions, n, sim_type, customers):
     """
     Get top n similar items for each user (with a purchase history)
     :param articles:
@@ -73,9 +75,7 @@ def get_similar_items(articles, transactions, n, sim_type, last_week_customers_o
     else:
         raise ValueError("Invalid similarity type")
 
-    if last_week_customers_only:
-        customers = transactions[transactions.week == transactions.week.max()].customer_id.unique()
-    else:
+    if customers is None:
         customers = transactions.customer_id.unique()
     purchase_history = transactions.groupby('customer_id')['article_id'].apply(list)
     # turn articles into indices
@@ -87,32 +87,14 @@ def get_similar_items(articles, transactions, n, sim_type, last_week_customers_o
                             })
               for customer in tqdm(customers, desc=f"Getting top {n} with {sim_type} similarity", leave=False)]
 
-    # result = []
-    # pool = Pool(7)
-    # for r in tqdm(pool.starmap(get_similar_items_customer, [(customer, sim, article_ids, purchase_history, n)
-    #                                                        for customer in customers]),
-    #               desc=f"Getting top {n} with {sim_type} similarity", total=len(customers), leave=False):
-    #     result.append(r)
-
     result_df = concat_downcast(result)
     result_df.reset_index(drop=True, inplace=True)
 
     return sim, article_map, result_df
 
 
-# def get_similarity_samples_w(data, transactions, n, sim_type, unique_transactions, test_set_transactions, w):
-#     custumers_to_use = unique_transactions if w < transactions.week.max() + 1 else test_set_transactions
-#     # get more samples for latter weeks, less for earlier weeks
-#     i = int((w - transactions.week.min()) / (transactions.week.max() + 1 - transactions.week.min()) * n)
-#     i = max(1, i)
-#     transactions_w = transactions[transactions.week < w]
-#     sim_matrix, article_map, sim_sam = get_similar_items(data['articles'], transactions_w, i, sim_type,
-#                                                          last_week_customers_only=True)
-#     sim_sam['week'] = w
-#     sim_sam = merge_downcast(custumers_to_use, sim_sam, on=['week', 'customer_id'])
-#     return sim_sam
-
-def get_similarity_samples(data, transactions, n, sim_type, unique_transactions, test_set_transactions, scale_n=False):
+def get_similarity_samples(data, transactions, n, sim_type, unique_transactions, test_set_transactions, n_train_weeks,
+                           scale_n=False):
     """
     Get negative samples for each week
     Get candidates for prediction
@@ -123,27 +105,40 @@ def get_similarity_samples(data, transactions, n, sim_type, unique_transactions,
     :param sim_type:
     :param unique_transactions:
     :param test_set_transactions:
+    :param n_train_weeks:
+    :param scale_n:
     :return: similarity matrix, dict mapping article ids to matrix indices, dataframe with similar items
     """
     previous_week_info = data['article_week_info']
     samples = pd.DataFrame()
     sim_matrix, article_map = None, None
-    for w in tqdm(range(transactions.week.min() + 1, transactions.week.max() + 2), desc=f"{sim_type} samples per week"):
-        customers_to_use = unique_transactions if w < transactions.week.max() + 1 else test_set_transactions
+    for w in tqdm(range(transactions.week.max() - n_train_weeks + 1, transactions.week.max() + 2),
+                  desc=f"{sim_type} samples per week"):
+        # for w in tqdm(range(transactions.week.max() + 1, transactions.week.max() + 2),
+        # desc=f"{sim_type} samples per week"):
+
+        transactions_w = transactions[transactions.week < w]
+        if w < transactions.week.max() + 1:
+            customers_to_use = unique_transactions[unique_transactions.week == w]
+            customers_to_use = customers_to_use[customers_to_use.customer_id.isin(transactions_w.customer_id.unique())]
+        else:
+            customers_to_use = test_set_transactions
         # get more samples for latter weeks, less for earlier weeks
         if scale_n:
             i = int((w - transactions.week.min()) / (transactions.week.max() + 1 - transactions.week.min()) * n)
             i = max(1, i)
         else:
             i = n
-        transactions_w = transactions[transactions.week < w]
         sim_matrix, article_map, sim_sam = get_similar_items(data['articles'],
                                                              transactions_w,
                                                              i,
                                                              sim_type,
-                                                             last_week_customers_only=True)
+                                                             customers=customers_to_use.customer_id.unique())
         sim_sam['week'] = w
         sim_sam = merge_downcast(customers_to_use, sim_sam, on=['week', 'customer_id'])
+        assert sim_sam.shape[0] == customers_to_use.shape[0] * i, \
+            f"Expected {customers_to_use.shape[0]} * {i} = {customers_to_use.shape[0] * i} samples, " \
+            f"got {sim_sam.shape[0]}"
         samples = concat_downcast([samples, sim_sam])
 
     samples = merge_downcast(samples,
@@ -187,7 +182,20 @@ def add_similarity(samples, purchase_hist, sim, sim_index):
     #     print(f"Swifter failed")
     #     print(e)
     tqdm.pandas()
-    s = samples[['customer_id', 'article_id', 'week']].progress_apply(lambda x: get_sim(x), axis=1,
-                                                                      raw=True)
+    s = samples[['customer_id', 'article_id', 'week']].progress_apply(lambda x: get_sim(x), axis=1,raw=True)
 
     return s
+
+
+def generate_similarity_candidates(data_dict, n, n_train_weeks, scale_n, similarity_candidates, test_set_transactions,
+                                   transactions_train, types, unique_transactions):
+    for sim_type in types:
+        sim_matrix, article_map, candidates = get_similarity_samples(data_dict, transactions_train, n, sim_type,
+                                                                     unique_transactions, test_set_transactions,
+                                                                     n_train_weeks,
+                                                                     scale_n)
+        data_dict[f'{sim_type}_similarity'] = sim_matrix
+        data_dict[f'{sim_type}_similarity_index'] = article_map
+
+        similarity_candidates = concat_downcast([similarity_candidates, candidates])
+    return similarity_candidates

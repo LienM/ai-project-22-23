@@ -12,17 +12,19 @@ pd.options.display.max_colwidth = 100
 pd.options.display.width = None
 
 
-def samples(data_dict, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=None, scale_n=False):
+def samples(data_dict, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=None, scale_n=False,
+            only_candidates=False):
     """
     Generate samples (positive, negative, candidates)
-    :param data_dict:
-    :param n_train_weeks:
+    :param data_dict: Dictionary with data
+    :param n_train_weeks: Int, number of weeks to use for training
     :param n: Number of samples per method, higher = higher recall
     :param ratio: Int, amount of negative samples for each positive sample
     :param verbose: Bool, whether to output more info
     :param methods: list containing used methods, subset of ['l0', 'w2v', 'itemknn', 'p2v', 'random']
     :param scale_n: Whether to reduce amount of negative samples for earlier weeks
-    :return:
+    :param only_candidates: Whether to only generate candidates for similarity/Recpack methods
+    :return: Dictionary with samples and other info
     """
     if methods is None:
         methods = ['itemknn', 'w2v', 'l0']
@@ -75,7 +77,7 @@ def samples(data_dict, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=No
         recpack_methods.append('prod2vec')
     recpack_candidates = generate_recpack_samples(n, n_train_weeks, previous_week_info, recpack_candidates,
                                                   recpack_methods, scale_n, test_set_transactions, transactions_train,
-                                                  unique_transactions, verbose)
+                                                  unique_transactions, verbose, only_candidates)
 
     # ========================================================
     # similarity candidates
@@ -87,7 +89,7 @@ def samples(data_dict, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=No
         types.append('l0')
     similarity_candidates = generate_similarity_candidates(data_dict, n, n_train_weeks, scale_n, similarity_candidates,
                                                            test_set_transactions, transactions_train, types,
-                                                           unique_transactions)
+                                                           unique_transactions, only_candidates)
 
     # ========================================================
     # Random candidates
@@ -200,6 +202,15 @@ def samples(data_dict, n_train_weeks=12, n=12, ratio=1, verbose=True, methods=No
 
 
 def downsample_negative_samples(all_samples, data_dict, ratio, test_week, verbose):
+    """
+    Downsample negative samples to match the ratio of positive to negative samples
+    :param all_samples: DataFrame with all samples
+    :param data_dict: Dictionary with data
+    :param ratio: Float, amount of negative samples per positive sample
+    :param test_week: Int, week to use for test set
+    :param verbose: Bool, whether to print info
+    :return: DataFrame with downsampled negative samples
+    """
     train = all_samples[all_samples.week != test_week].sort_values(by=['week', 'customer_id']).reset_index(drop=True)
     candidates = all_samples[all_samples.week == test_week] \
         .sort_values(by=['week', 'customer_id']).reset_index(drop=True)
@@ -226,6 +237,16 @@ def downsample_negative_samples(all_samples, data_dict, ratio, test_week, verbos
 
 def generate_bestseller_samples(bestseller_candidates, bestseller_types, n, previous_week_info, test_set_transactions,
                                 unique_transactions):
+    """
+    Generate bestseller samples for each bestseller type
+    :param bestseller_candidates: DataFrame with bestseller candidates (empty)
+    :param bestseller_types: List of bestseller types
+    :param n: Number of bestseller samples to generate
+    :param previous_week_info: DataFrame with previous week info
+    :param test_set_transactions: DataFrame with customers for the test week
+    :param unique_transactions: DataFrame with unique customer interactions per week
+    :return: DataFrame with bestseller samples
+    """
     print(f"Generating popularity samples", end="")
     for bestseller_type in bestseller_types:
         # for customers who made purchases, generate negative samples based on the popular items at the time
@@ -258,6 +279,13 @@ def generate_bestseller_samples(bestseller_candidates, bestseller_types, n, prev
 
 
 def generate_repurchase_candidates(test_week, transactions_train):
+    """
+    Generate repurchase candidates for the test week
+    Same as in https://github.com/radekosmulski/personalized_fashion_recs
+    :param test_week: Int, week for which we generate candidates
+    :param transactions_train: DataFrame, transactions for training
+    :return: DataFrame, repurchase candidates
+    """
     # repurchasing
     print(f"Adding repurchasing candidates", end="")
     c2weeks = transactions_train.groupby('customer_id')['week'].unique()
@@ -277,6 +305,15 @@ def generate_repurchase_candidates(test_week, transactions_train):
 
 
 def concat_and_remove_dupes(first, second, verbose=True, kind="New"):
+    """
+    Concatenates two dataframes and removes duplicates.
+    Useful for checking if methods generate similar samples.
+    :param first: DataFrame
+    :param second: DataFrame
+    :param verbose: Bool, whether to print the number of duplicates
+    :param kind: String, kind of samples, for printing
+    :return: DataFrame
+    """
     new_samples = len(second)
     first = concat_downcast([first, second])
     duplicates = first[['customer_id', 'article_id', 'week']].duplicated(keep="first").sum()

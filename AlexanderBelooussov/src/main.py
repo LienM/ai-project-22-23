@@ -13,12 +13,14 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-# TODO
-# tests and asserts
-# test without negative sample generation
-
-
 def random_search_grid_cv(runs=10, frac=0.05):
+    """
+    Random search for hyperparameters
+    Warning: takes a long time to run
+    :param runs: number of runs
+    :param frac: fraction of customers to use
+    :return:
+    """
     grid = {
         'n_train_weeks': [5, 8, 12],
         'n': [12, 25, 50],
@@ -28,6 +30,7 @@ def random_search_grid_cv(runs=10, frac=0.05):
         'itemknn': [True, False],
         'n_estimators': [100, 10, 200, 50],
         'ratio': [1, 10, 30, 100],
+        'only_candidates': [True, False],
     }
 
     grid = list(ParameterGrid(grid))
@@ -52,7 +55,8 @@ def random_search_grid_cv(runs=10, frac=0.05):
                 w2v=params['w2v'],
                 p2v=False,
                 random_samples=params['random'],
-                n_estimators=params['n_estimators']
+                n_estimators=params['n_estimators'],
+                only_candidates=params['only_candidates']
             )
             print(f"{params.items()}: {score:.4}, {recall:.4}")
             scores.append(score)
@@ -87,7 +91,8 @@ def main(
         p2v=False,
         random_samples=True,
         n_estimators=100,
-        preprocessed_data=None
+        preprocessed_data=None,
+        only_candidates=False,
 ):
     methods = []
     if itemknn:
@@ -126,7 +131,8 @@ def main(
         data_dict = preprocessed_data
 
     # generate samples and candidates
-    data_dict = samples(data_dict, n_train_weeks=n_train_weeks, n=n, ratio=ratio, methods=methods, verbose=verbose)
+    data_dict = samples(data_dict, n_train_weeks=n_train_weeks, n=n, ratio=ratio, methods=methods, verbose=verbose,
+                        only_candidates=only_candidates)
 
     if cv:
         train_customers = data_dict['transactions']['customer_id'].unique()
@@ -171,6 +177,7 @@ if __name__ == '__main__':
     parser.add_argument('--p2v', action='store_true', default=False)
     parser.add_argument('--random', action='store_true', default=False)
     parser.add_argument('--grid', action='store_true', default=False)
+    parser.add_argument('--only_candidates', action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -191,5 +198,6 @@ if __name__ == '__main__':
             w2v=args.w2v,
             p2v=args.p2v,
             random_samples=args.random,
-            n_estimators=args.n_estimators
+            n_estimators=args.n_estimators,
+            only_candidates=args.only_candidates
         )

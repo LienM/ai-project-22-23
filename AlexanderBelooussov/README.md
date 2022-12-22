@@ -3,6 +3,8 @@ ___
 ## Main Python Files
 As you can see, I chose to not use notebooks for this project. Instead, I decided to split my code into several python files. Code can be found in the src directory. Below I list a brief description of each file's function.
 
+#### Working Directory should be set to src
+
 ### Main
 File that coordinates execution of the recommender, as well as cross validation tests. Execution can be controlled using command line parameters
 
@@ -12,13 +14,20 @@ File that coordinates execution of the recommender, as well as cross validation 
 * `--ratio <int>`: The amount of negative samples to use for every positive sample. This is an upper limit, and may not be reached if not enough negative samples are generated. default=1
 * `--n_estimators <int>`: Amount of trees to use with LightGBM. default=100
 * `--cv`: Whether to leave out the last week and use it for validation. Allows calculating the MAP@12 and recall for the last week.
-* `--verbose`: Whether to print more output
+* `--verbose`: Whether to print more output. This can be useful for verifying that the code is running correctly.
 * `--itemknn`: Whether to generate samples and candidates using ItemKNN
 * `--l0`: Whether to generate samples and candidates using l0-norm or hamming distance to previously purchased items to generate samples and candidates
 * `--w2v`: Whether to generate negative samples and candidates using Word2Vec similarity to previously purchased items to generate samples and candidates
 * `--p2v`: Whether to generate negative samples and candidates using Prod2Vec
 * `--random`: Whether to randomly generate negative samples
 * `--grid`: Perform a random grid search. This makes a grid of some possible parameters and runs cross validation on a random subsection. All other parameters except --frac are ignored.
+* `--only_candidates`: Last-minute addition, allows similarity/Recpack methods to only generate candidates for the test week, without generating negative samples.
+
+#### Example Usage
+32GB RAM Recommended
+```cmd
+python main.py --frac 0.1 --cv --ratio 300 --n_train_weeks 5 --n 15 --n_estimators 10 --random --l0 --verbose --only_candidates
+```
 
 ### Preprocessing
 This file takes care of preprocessing and writing feather files.

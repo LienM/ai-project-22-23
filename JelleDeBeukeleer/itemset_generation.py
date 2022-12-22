@@ -11,17 +11,8 @@ import pandas as pd
 from efficient_apriori import apriori
 import numpy as np
 import random
-import datetime
 import json
-import math
 import multiprocessing as mp
-from sklearn import preprocessing
-import lightgbm as lgbm
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
-import gc
 
 ######################################################################################################
 
@@ -29,7 +20,7 @@ settings_file = "./settings.json"
 settings = json.load(open(settings_file))
 random.seed(42)
 
-# read file from settings
+# read files from settings
 data_dir = settings["data_directory"]
 processed_filenames = settings["data_filenames"]["processed"]
 candidate_filenames = settings["candidate_filenames"]
@@ -38,6 +29,9 @@ transactions = transactions[transactions["ordered"] == 1]
 bestsellers = pd.read_csv(data_dir + processed_filenames["bestsellers"])
 articles = pd.read_csv(data_dir + processed_filenames["articles"])
 
+"""
+Slicing transactions to recent slice, in order to have more relevant information
+"""
 candidate_columns = transactions.columns
 print("taking recent slice")
 full_weeks = settings["full_weeks"]
@@ -46,18 +40,34 @@ max_week = transactions["t_dat"].max() + 1
 transactions = transactions[(max_week - transactions["t_dat"]) <= recent_weeks]
 bestsellers = bestsellers[bestsellers["t_dat"] == max_week]
 
+"""
+Baskets are the set of transactions each user has made across the timeframe,
+does not keep track of order or re-purchases
+"""
 print("generating baskets")
 baskets = transactions.groupby("customer_id")["article_id"].apply(set).values
 baskets = baskets.tolist()
+
+"""
+Parameters for the library are slightly different
+support is scaled by the amount of baskets in the dataset,
+meaning a min_support of 0.1 requires an item set to appear in 10% of all baskets
+The settings file specifies a flat number however which has to be scaled 
+"""
 print("running apriori")
 min_support = settings["itemset_params"]["min_support"]
 min_support = min_support / len(baskets)
 nr_of_transactions = len(transactions)
+"""
+Recommendations should at least be equally confident as randomly recommending
+the most popular item
+"""
 min_confidence = transactions.article_purchase_count.max() / len(baskets)
 
 line_items = 0
 customer_counter = 0
 # reset transactions to full length for generating baskets
+# I am not sure which was better
 transaction_filename = data_dir + processed_filenames["transactions"]
 transactions = pd.read_csv(transaction_filename)
 candidate_df = pd.DataFrame(columns=candidate_columns)
@@ -73,6 +83,14 @@ file_counter = 0
 
 
 def run_apriori(baskets, min_support, min_confidence):
+    """
+    Calls the apriori algorithm from the library, using specified
+    parameters
+    :param baskets: a transaction set of each customer
+    :param min_support: the minimum support for each rule, scaled to dataset size
+    :param min_confidence: the minimum confidence in each rule
+    :return: a list of association rules, ordered by decreasing confidence
+    """
     print("using min_support of", str(min_support))
     print("using min_confidence of", str(min_confidence))
     itemset, result = list(apriori(baskets, min_confidence=min_confidence,
@@ -95,6 +113,15 @@ def run_apriori(baskets, min_support, min_confidence):
 
 
 def get_recommendations(itemset: set, max_count: int, rules):
+    """
+    For a set of items, generate a list of recommendations,
+    if a rule would cause the recommendation count to exceed max_count,
+    a random sample is chosen to recommend
+    :param itemset: the previously bought items
+    :param max_count: the maximum amount of items to recommend
+    :param rules: the association rules generated from apriori
+    :return: a set of items to recommend a user
+    """
     recs = set()
     for key in rules.keys():
         precedent = set(key)
@@ -109,8 +136,21 @@ def get_recommendations(itemset: set, max_count: int, rules):
 
 
 def handle_customers(chunks, i, candidate_count, rules):
+    """
+    Multiprocessing function,
+    takes the i'th element of the customer chunks, and generates recommendations
+    for each candidate
+
+    The function keeps track of an intermediate dataframe holding all candidates
+    Once this exceeds a certain size the dataframe is written to a candidate file,
+    and also concatenated to a negative samples dataframe
+    :param chunks: a list of chunks of customer entries
+    :param i: the index of the chunk to handle within this process
+    :param candidate_count: the amount of items to recommend per user
+    :param rules: association rules previously generated
+    :return: None
+    """
     global candidate_df
-    done_count = 0
     customers = chunks[i]
     file_counter = 0
     customers = customers[customers["customer_id"].isin(cid)].copy()
@@ -120,6 +160,11 @@ def handle_customers(chunks, i, candidate_count, rules):
     customers["baskets"] = customers["baskets"].fillna("").apply(set)
 
     def write_df(df: pd.DataFrame):
+        """
+        writes the internal df and concatenates it to the negative samples
+        :param df: a dataframe holding candidate transactions
+        :return: None
+        """
         global neg_candidates
         global file_counter
         candidate_dir = settings["candidate_directory"]
@@ -134,6 +179,12 @@ def handle_customers(chunks, i, candidate_count, rules):
         neg_candidates.drop_duplicates(subset=["customer_id", "article_id"], inplace=True)
 
     def generate_recs(customer_id, done_count):
+        """
+        For a given customer id, determine the recommendations based on prior purchases
+        :param customer_id:
+        :param done_count:
+        :return:
+        """
         global candidate_df
         global neg_candidates
         row = customers[customers["customer_id"] == customer_id].copy()
@@ -162,12 +213,20 @@ def handle_customers(chunks, i, candidate_count, rules):
 
     print("writing all recommendations to file")
     customers["customer_id"].apply(generate_recs)
+    # at the end, write remaining entries to last csv
     if len(candidate_df) > 0:
         write_df(candidate_df)
         candidate_df = pd.DataFrame(columns=candidate_columns)
 
 
 def add_negative_samples(transactions, neg_candidates):
+    """
+    concatenates negative samples generated from association rules to the
+    original transactions dataframe, then writes to original file
+    :param transactions:
+    :param neg_candidates:
+    :return:
+    """
     print("adding negative samples to last training week")
     transactions = pd.concat([transactions, neg_candidates])
     transactions.drop_duplicates(subset=["customer_id", "article_id", "t_dat"], inplace=True)

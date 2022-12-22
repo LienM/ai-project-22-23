@@ -1,5 +1,9 @@
 import pandas as pd
 
+
+"""
+Simple script, merges all intermediate predictions files to one final predictions.csv
+"""
 df = pd.DataFrame(columns=["customer_id", "prediction"])
 
 for i in range(5):

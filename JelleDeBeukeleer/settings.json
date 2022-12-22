@@ -1,0 +1,54 @@
+{
+    "recommendation_count":12,
+    "dataset_size": "sample",
+    "data_directory":"../data/",
+    "candidate_directory":"../data/candidates/",
+    "predictions_directory":"../data/predictions/",
+    "data_filenames":
+    {
+        "predictions":"predictions.csv",
+        "full":
+        {
+            "customers":"customers.csv",
+            "articles":"articles.csv",
+            "transactions":"transactions_train.csv"
+        },
+        "sample":
+        {
+            "customers":"customers_sample01.csv.gz",
+            "articles":"articles_sample01.csv.gz",
+            "transactions":"transactions_sample01.csv.gz"
+        },
+        "processed":{
+            "customers":"customers_processed.csv",
+            "articles":"articles_processed.csv",
+            "transactions":"transactions_processed.csv",
+			"bestsellers":"bestsellers.csv"
+        }
+    },
+    "full_weeks":8,
+    "recent_weeks":2,
+    "training_weeks":4,
+    "activity_range": [1, 5, 1],
+    "processed_features":[
+            "customer_id", "age", "postal_code", "sales_channel_id", "article_id", "price", "ordered",
+            "product_type_no", "customer_purchase_count", "article_purchase_count",
+            "average_customer_budget", "average_article_price", "price_discrepancy",
+            "first_purchase_count", "t_dat", "bestseller_rank"
+            ],
+
+    "itemset_params":{
+        "candidate_count":10,
+		"min_support":10
+    },
+    "popular_candidates":20,
+    "price_candidates":20,
+	"candidate_filenames":{
+		"itemsets": "itemset_candidates.csv",
+		"popular":"popular_candidates.csv",
+		"age_based":"age_candidates.csv"
+	},
+    "prediction_filenames":{
+      "final": "predictions.csv"
+    }
+}

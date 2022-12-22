@@ -1,0 +1,9 @@
+pandas
+swifter
+pandas-downcast
+recpack
+lightgbm
+matplotlib
+tqdm
+gensim
+pyarrow

@@ -66,6 +66,8 @@ transactions = pd.merge(transactions, articles, on="article_id", how="left")
 transactions = pd.merge(transactions, customers, on="customer_id", how="left")
 
 # tf does this do? This code is necessary otherwise the model will not work :(
+# When I was looking at the notebook and implementing the functions myself I noticed that my model didn't work at all
+# The moment that
 transactions.sort_values(["week", "customer_id"], inplace=True)
 transactions.reset_index(drop=True, inplace=True)
 
@@ -87,8 +89,8 @@ cols += ["fall", "rank", "dep_colour_0", "dep_colour_1"]
 cols += [f"prod_name_{i}" for i in range(8)]
 cols += [f"detail_desc_{i}" for i in range(8)]
 
+# Train the model, and save it
 if TRAIN_MODEL:
-    # Train the model, and save it
     print("starting model training")
     model = train_model(train, cols)
     pickle.dump(model, open(path("models", "best_last_rank3"), "wb"))

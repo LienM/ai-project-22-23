@@ -131,9 +131,11 @@ we've taken our samples from. So, every function that
 says `(correlation analysis)` in its docstring participates in the correlation
 analysis. These files can also be found by looking at the first number. If it
 is either 102, 103, 104, or 105 then those files can be used in the correlation
-analysis. The evaluation is done in the `evaluation.py` file.
+analysis. The evaluation is done in the `evaluation.py` file located in the
+`helper` folder.
 
 ### Graph embeddings
+All the files for graph embeddings are located in the `graph_embedding` folder.
 
 You create embeddings of a graph using a skip-n-gram model on the random walks
 of the graph. We used 3 different algorithms to create graphs. They are further
@@ -145,5 +147,13 @@ of annoy. The embeddings are generated in `embed.py` and the indexing is done in
 `index.py`. The code to generate the candidates is in `candidates.py`.
 
 ### Age bin popularity
+All the files used for age bin popularity can be found in the `notebook` folder.
 
 ## Exploration
+
+This is a less important part of the project, but here is some of the code used
+to generate the plots used in the presentation.
+
+## Other files
+
+all other files are helping to clean up and do other stuff.

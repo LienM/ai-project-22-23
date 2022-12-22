@@ -176,22 +176,25 @@ def pp_transactions(transactions):
     transactions['week'] = ((transactions.t_dat - start).dt.days // 7).astype('int16')
 
     # add day of week
-    transactions['day_of_week'] = (transactions.t_dat.dt.dayofweek).astype('int8')
-    dow_encoder = LabelEncoder()
-    transactions['day_of_week'] = pd.to_numeric(dow_encoder.fit_transform(transactions['day_of_week']),
-                                                downcast='integer')
+    # transactions['day_of_week'] = (transactions.t_dat.dt.dayofweek).astype('int8')
+    # dow_encoder = LabelEncoder()
+    # transactions['day_of_week'] = pd.to_numeric(dow_encoder.fit_transform(transactions['day_of_week']),
+    #                                             downcast='integer')
 
     # add month
-    transactions['month'] = (transactions.t_dat.dt.month).astype('int8')
+    # transactions['month'] = (transactions.t_dat.dt.month).astype('int8')
 
     # add year
-    transactions['year'] = (transactions.t_dat.dt.year - 2000).astype('int8')
+    # transactions['year'] = (transactions.t_dat.dt.year - 2000).astype('int8')
 
     # add day of month
-    transactions['day'] = (transactions.t_dat.dt.day).astype('int8')
+    # transactions['day'] = (transactions.t_dat.dt.day).astype('int8')
 
     # remove t_dat
     transactions.drop(columns=['t_dat'], inplace=True)
+
+    # remove sales_channel_id
+    transactions.drop(columns=['sales_channel_id'], inplace=True)
 
     # print(transactions.head(20))
     return transactions

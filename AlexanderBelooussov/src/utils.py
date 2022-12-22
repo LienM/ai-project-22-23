@@ -1,4 +1,5 @@
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -175,7 +176,7 @@ def merge_downcast(df1, df2, **kwargs):
         dcdf = pdc.downcast(df)
         return dcdf
     except:
-        print(f"Downcasting failed")
+        warnings.warn(f"Downcasting failed")
         return df
 
 
@@ -187,7 +188,7 @@ def concat_downcast(dfs, **kwargs):
         dcdf = pdc.downcast(df)
         return dcdf
     except:
-        print(f"Downcasting failed")
+        warnings.warn(f"Downcasting failed")
         return df
 
 

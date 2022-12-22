@@ -10,6 +10,7 @@ going to buy
 * [Setup](#setup)
 * [Dataset cleaning](#dataset-cleaning)
 * [Research questions](#research-questions)
+    * [Correlation](#correlation)
     * [Graph embeddings](#graph-embeddings)
     * [Age bin popularity](#age-bin-popularity)
 * [Exploration](#exploration)
@@ -40,8 +41,6 @@ use. We also have a requirements.txt file with all of them listed.
 * `seaborn`: plotting graphs
 * `joblib`: saving and loading models
 * `tqdm`: showing progress bars
-* `time`: measure the duration of pieces of code
-* `itertools`: creating product combinations and using chain function
 * `networkx`: creating embedding graphs
 * `karateclub`: deepwalk algorithm
 * `annoy`: knn indexing for graph embeddings
@@ -49,39 +48,44 @@ use. We also have a requirements.txt file with all of them listed.
 * `scipy`: ranking data in order to make a denser representation and correlation
   distance
 * `sklearn`: used for label encoder and train test split
-* `filecmp`: comparing 2 files
 * `lightgbm`: ranking our candidates
 
 ## Setup
+
 We assume that we are in the root of the project, unless mentioned otherwise.
 Another assumption is that you require a minimum of 32GB of RAM to run this.
 
 In order to be able to run the code you first must run this line for downloading
 all the libaries:
+
 ```bash
 pip3 install -r requirements.txt
 ```
 
 After you've installed all the libraries it is time to make the appropriate
 folders:
+
 ```bash
 mkdir data
 mkdir out
 ```
 
 to finish the code setup you can run, to clean up the data and create samples:
+
 ```bash
 python3 dataset.py
 ```
 
 to run the embeddings research question results:
+
 ```bash
 python3 BasilRommens/graph_embedding/embed.py
 python3 BasilRommens/graph_embedding/candidates.py
 ```
 
 TODO
-to run the age bin popularity research question results: 
+to run the age bin popularity research question results:
+
 ```bash
 ```
 
@@ -108,22 +112,33 @@ dataset.
 ## Research questions
 
 Throughout the course we needed to come up with research questions. We will
-further elaborate in the following subsections. I used following research 
+further elaborate in the following subsections. I used following research
 questions:
 
+* Is there any correlation between the cross validation and the leaderboard?
 * Can we get score improvements by using graph embeddings?
     * If so, can we improve the performance through putting time inside the
-      graph? 
+      graph?
 * Do we improve the score by adding most popular items within age bins as
   candidates?
-  * If so, then what are optimal age bins to work with?
+    * If so, then what are optimal age bins to work with?
+
+### Correlation
+
+To check if there is any correlation between the cross validation and the
+leaderboard, we need to use some extra annotations in the code to show where
+we've taken our samples from. So, every function that
+says `(correlation analysis)` in its docstring participates in the correlation
+analysis. These files can also be found by looking at the first number. If it
+is either 102, 103, 104, or 105 then those files can be used in the correlation
+analysis. The evaluation is done in the `evaluation.py` file.
 
 ### Graph embeddings
 
 You create embeddings of a graph using a skip-n-gram model on the random walks
 of the graph. We used 3 different algorithms to create graphs. They are further
 specified in the file `embed.py`. We also used set up 5 different experiments to
-generate suitable candidates for recommending items for customers. They are 
+generate suitable candidates for recommending items for customers. They are
 listed at the bottom. As we use embeddings, we also want tot find the k nearest
 as fast as possible and therefore we use indexing to do this, through the use
 of annoy. The embeddings are generated in `embed.py` and the indexing is done in

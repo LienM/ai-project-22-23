@@ -9,10 +9,10 @@ def rank(data, verbose=True, n_estimators=100):
     """
     Create train and test sets for LightGBM Ranker
     Train LightGBM model and make predictions
-    :param data:
-    :param verbose:
-    :param n_estimators:
-    :return:
+    :param data: Dictionary with preprocessed data
+    :param verbose: Print progress
+    :param n_estimators: Number of estimators for LightGBM
+    :return: DataFrame with predictions
     """
     use_val = False
     ranker_type = "ranker"

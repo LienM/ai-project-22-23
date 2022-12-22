@@ -16,6 +16,14 @@ magic_number = 5
 
 
 def append_negatives(df: pd.DataFrame, neg_samples: pd.DataFrame, week: int):
+    """
+    Adds negative samples to a complete dataframe (e.g. original transactions)
+    and removes duplicates
+    :param df:
+    :param neg_samples:
+    :param week:
+    :return:
+    """
     global customer_df
     global articles_df
     global bestsellers
@@ -36,6 +44,13 @@ def append_negatives(df: pd.DataFrame, neg_samples: pd.DataFrame, week: int):
 
 
 def random_negatives(df: pd.DataFrame, week: int = None):
+    """
+    Generates a random sample of transactions, and appends the non-existing
+    ones to the negative samples
+    :param df:
+    :param week:
+    :return:
+    """
     global magic_number
     if not week:
         week = df["t_dat"].max()
@@ -49,6 +64,13 @@ def random_negatives(df: pd.DataFrame, week: int = None):
 
 
 def focused_negatives(df: pd.DataFrame, week: int):
+    """
+    For each week, add the transactions to the previous week as negative samples
+    and remove overlapping transactions
+    :param df:
+    :param week:
+    :return:
+    """
     positive_view = df.ordered == 1
     neg_samples = df[positive_view].copy()
     original_week = week + 1

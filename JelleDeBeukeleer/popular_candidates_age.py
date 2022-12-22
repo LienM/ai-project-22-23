@@ -17,6 +17,13 @@ bestsellers = pd.read_csv(bestsellers_filename)
 prediction_week = transactions.t_dat.max() + 1
 bestsellers = bestsellers[bestsellers["t_dat"] == prediction_week]
 
+"""
+Using a sliding window with an age range of 5 (-2 to +2), 
+determines the most popular items for each window
+
+One note is that 0 is used as a NaN replacement, this does mean that NaN-ages
+are not part of any other window and vice versa, but they do get a separate category this way
+"""
 print('generating age-dependent candidates')
 most_popular_count = settings["popular_candidates"]
 age_distance = 2
@@ -24,6 +31,7 @@ age_list = pd.read_csv(customers_filename)["age"].sort_values().unique()
 articles = pd.read_csv(articles_filename)
 article_columns = ["age"] + articles.columns
 popular_articles = pd.DataFrame(columns=article_columns)
+
 
 for age in age_list:
     temp = transactions[transactions["age"] == age].drop_duplicates()
@@ -39,6 +47,10 @@ popular_articles = popular_articles.merge(articles, how="left", on="article_id")
 
 counter = 0
 customers = pd.read_csv(customers_filename)
+"""
+For customers of each age, determine the relevant window to look in, and
+concatenate all items to the recommendations
+"""
 for age in age_list:
     print("working for age", age, end="\r")
     customer_temp = customers[customers["age"] == age].copy()

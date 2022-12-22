@@ -46,6 +46,9 @@ customers_filename = data_dir + file_dict[dataset_size]["customers"]
 print("reading dataframes")
 articles = pd.read_csv(articles_filename)
 customers = pd.read_csv(customers_filename)
+"""
+Re-fit the customer encoder so that the customer id's can later be reversed
+"""
 customer_encoder = preprocessing.LabelEncoder()
 article_encoder = preprocessing.LabelEncoder()
 customer_encoder.fit(customers['customer_id'])
@@ -73,6 +76,17 @@ del transactions
 customer_chunks = pd.read_csv(customers_filename, chunksize=300000)
 customer_counter = 0
 
+"""
+Customers are treated in chunks of 300,000
+For each customer, scan all candidate files and generate predictions
+After each scan, only keep top 12 recommendations per customer in the batch
+
+Once every file has been scanned, a csv file is written for the customers within the batch
+(results in 5 files to be merged later)
+
+This version concatenates all the prediction results within a batch in memory,
+resulting in less disk I/O (and less intermediate files) at the cost of more memory usage 
+"""
 for customers in customer_chunks:
     counter = 0
     predictions_files = []

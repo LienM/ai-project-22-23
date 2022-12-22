@@ -12,6 +12,11 @@ processed_filenames = settings["data_filenames"]["processed"]
 transactions = pd.read_csv(data_dir + processed_filenames["transactions"])
 prediction_week = transactions.t_dat.max() + 1
 
+
+"""
+Popular candidate generation is relatively simple, going by article_purchase_count for each article
+and keeping some amount of top scorers
+"""
 print('generating global candidates')
 most_popular_count = settings["popular_candidates"]
 popular_items = transactions[transactions['ordered'] == 1].drop_duplicates(subset='article_id')

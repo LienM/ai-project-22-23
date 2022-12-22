@@ -6,6 +6,14 @@ from ensemble_model import make_model, CustomEnsemble
 
 
 def plot_scores(weeks: list, scores: list, filename: str = None):
+    """
+    Simple plotting function, writes to file if filename specified,
+    otherwise shows plot
+    :param weeks: list of training lengths, used as x values
+    :param scores: list of scores per week, used as y values
+    :param filename: file to which to write plot
+    :return:
+    """
     plt.xlabel("amount of preceding training weeks")
     plt.ylabel("validation score")
     plt.title("validation scores by preceding training weeks")
@@ -20,6 +28,13 @@ def plot_scores(weeks: list, scores: list, filename: str = None):
 
 
 def plot_features(weeks: list, feature_maps: list, filename: str = None):
+    """
+    Plot feature importances per length of training windows
+    :param weeks: list of training lengths, used as x values
+    :param feature_maps: list of dictionaries, mapping feature -> score
+    :param filename: file to which to write plot
+    :return: None
+    """
     plt.xlabel("amount of preceding training weeks")
     plt.ylabel("importance per feature")
     plt.title("feature importance by preceding training weeks")
@@ -42,6 +57,14 @@ def plot_features(weeks: list, feature_maps: list, filename: str = None):
 
 
 def validate_sliding_window(df: pd.DataFrame, training_weeks: int = 1):
+    """
+    Trains a model on each window of length == training_weeks
+    Then validates on the first week after the training window
+    total score is the average of scores across all windows
+    :param df: transactions dataframe from which to derive training and validation data
+    :param training_weeks: amount of weeks on which the model can be trained
+    :return: average validation score across all windows
+    """
     transaction_weeks = df.t_dat.unique()
     prediction_week = transaction_weeks.max()
     scores = []
@@ -70,7 +93,11 @@ def validate_sliding_window(df: pd.DataFrame, training_weeks: int = 1):
     mean_score = sum(scores) / len(scores)
     return mean_score, model.feature_importances_()
 
-
+"""
+Assuming all weeks are subsequent (there are no empty transaction weeks),
+take all possible training lengths while still having one validation week
+and validate the model on this
+"""
 if __name__ == "__main__":
     settings_file = "./settings.json"
     settings = json.load(open(settings_file))

@@ -3,7 +3,7 @@ import random
 import numpy as np
 from annoy import AnnoyIndex
 
-from BasilRommens.dataset import read_data_set
+from BasilRommens.helper.dataset import read_data_set
 
 
 # code is based on code of Thomas Dooms unless mentioned otherwise

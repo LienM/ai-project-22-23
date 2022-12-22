@@ -6,7 +6,7 @@ import numpy as np
 from karateclub import DeepWalk
 from tqdm import tqdm
 
-from BasilRommens.dataset import read_data_set
+from BasilRommens.helper.dataset import read_data_set
 
 
 def connect_all_left_to_right(lnodes, rnodes, graph):

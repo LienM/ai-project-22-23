@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from BasilRommens.dataset import read_data_set
+from BasilRommens.helper.dataset import read_data_set
 from BasilRommens.graph_embedding.knn import get_nn_index
 
 

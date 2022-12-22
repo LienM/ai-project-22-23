@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 
-from BasilRommens.cleaning import clean_articles, clean_customers, \
+from BasilRommens.helper.cleaning import clean_articles, clean_customers, \
     clean_transactions
 
 

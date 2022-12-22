@@ -9,10 +9,10 @@ import swifter
 def w2v_articles(articles, verbose=True, vec_size=25):
     """
     Creates word2vec embeddings for the prod_name column
-    :param articles:
-    :param verbose:
-    :param vec_size:
-    :return:
+    :param articles: Dataframe containing the articles data
+    :param verbose: Whether to print progress
+    :param vec_size: Size of the word2vec vectors
+    :return: Modified dataframe
     """
     if vec_size < 1:
         return articles
@@ -51,11 +51,11 @@ def w2v_articles(articles, verbose=True, vec_size=25):
 def pp_articles(articles, transactions, params, verbose=True):
     """
     Preprocesses the articles data
-    :param articles:
-    :param transactions:
-    :param params:
-    :param verbose:
-    :return:
+    :param articles: Dataframe containing the articles data
+    :param transactions: Dataframe containing the transactions data
+    :param params: Dictionary containing the parameters
+    :param verbose: Whether to print progress
+    :return: Modified dataframe
     """
     # reduce memory usage
     articles['article_id'] = pd.to_numeric(articles['article_id'], downcast='integer')
@@ -102,7 +102,7 @@ def pp_articles(articles, transactions, params, verbose=True):
 def customer_id_transform(df, target_row):
     """
     Helper function that transforms the customer_id column into integers
-    :param df:
+    :param df: Dataframe containing the transactions/customer data
     :param target_row: Name of the target row, string
     :return: Modified dataframe
     """
@@ -113,9 +113,9 @@ def customer_id_transform(df, target_row):
 def pp_customers(customers, transactions):
     """
     Preprocesses the customers data
-    :param customers:
-    :param transactions:
-    :return:
+    :param customers: Dataframe containing the customers data
+    :param transactions: Dataframe containing the transactions data
+    :return: Modified dataframe
     """
     cus_keys = customers.copy()
     cus_keys.drop(columns=[x for x in customers.columns if x != 'customer_id'], inplace=True)
@@ -158,8 +158,8 @@ def pp_customers(customers, transactions):
 def pp_transactions(transactions):
     """
     Preprocesses the transactions data
-    :param transactions:
-    :return:
+    :param transactions: Dataframe containing the transactions data
+    :return: Modified dataframe
     """
     # reduce memory usage
     transactions['article_id'] = pd.to_numeric(transactions['article_id'], downcast='integer')
@@ -167,6 +167,7 @@ def pp_transactions(transactions):
     transactions['customer_id'] = transactions['customer_id'].apply(lambda x: int(x[-8:], 16)).astype('int32')
     # print(transactions.info())
 
+    """ Only week was used, other date related features were not used in the final model """
     # add week no from start of data
     start = transactions['t_dat'].min() - pd.Timedelta(
         days=1)  # week starts on wednesday, but first day in data is thursday
@@ -203,12 +204,12 @@ def pp_transactions(transactions):
 def pp_data(data, params, force=False, write=True, verbose=True):
     """
     Preprocesses all data
-    :param data:
-    :param params:
-    :param force:
-    :param write:
-    :param verbose:
-    :return:
+    :param data: Dictionary containing the dataframes
+    :param params: Parameters for preprocessing
+    :param force: If True, preprocessing is done even if the preprocessed data already exists
+    :param write: If True, the preprocessed data is written to feather files
+    :param verbose: Print progress
+    :return: Preprocessed data
     """
     articles = data['articles']
     customers = data['customers']

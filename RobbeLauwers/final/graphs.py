@@ -1,5 +1,11 @@
+import pip
+pip.main(['install', 'matplotlib'])
+pip.main(['install', 'seaborn'])
+pip.main(['install', 'nuumpy'])
+
 import matplotlib.pyplot
 import seaborn as sns
+import numpy as np
 import csv
 
 def journey(full=False):
@@ -45,9 +51,11 @@ def weeks():
     with open("score_weeks.csv") as f:
         read = csv.reader(f)
         for row in read:
-            weeks.append(int(row[0]))
+            weeks.append(float(row[0]))
             numbers.append(float(row[1]))
 
+    weeks = np.array(weeks)
+    numbers = np.array(numbers)
     print(numbers)
     sns.set_theme()
     # sns.lineplot(numbers)
@@ -85,5 +93,5 @@ def candidates():
 
 # weeks()
 # journey()
-journey(full=True)
-# candidates()
+# journey(full=True)
+candidates()

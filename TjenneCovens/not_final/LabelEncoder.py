@@ -32,12 +32,15 @@ class MultiLabelEncoder:
 
         return dataframe
 
-    def decode(self, encoder_name, label, dataframe):
+    def decode_df(self, encoder_name, label, dataframe):
         decoder = self.decoders[encoder_name]
         dataframe.rename(columns={label: 'encoded'}, inplace=True)
         dataframe = dataframe.merge(decoder, how="left", on="encoded")
         dataframe.drop(columns={"encoded"}, inplace=True)
         dataframe.rename(columns={"original": label}, inplace=True)
         return dataframe
+
+
+
 
 

@@ -1,4 +1,5 @@
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -9,19 +10,17 @@ from tqdm import tqdm
 DATA_DIR = os.environ.get('DATA_DIR', '../../data/')
 
 
-def get_max_date(data):
-    max_row = data.sort_values(by=['year', 'month', 'day'], inplace=True, ascending=False).head(1)[
-        ['year', 'month', 'day']]
-    year = max_row['year'].values[0]
-    month = max_row['month'].values[0]
-    day = max_row['day'].values[0]
-    return {'year': year,
-            'month': month,
-            'day': day,
-            'date': pd.to_datetime(f"{year}-{month}-{day}", format='%Y-%m-%d')}
-
-
 def load_data(read_articles=True, read_customers=True, read_transactions=True, frac=1, seed=42, verbose=True):
+    """
+    Load data from csv files
+    :param read_articles: Boolean, whether to read articles.csv
+    :param read_customers: Boolean, whether to read customers.csv
+    :param read_transactions: Boolean, whether to read transactions.csv
+    :param frac: Float, fraction of data to read
+    :param seed: Int, seed for random sampling
+    :param verbose: Boolean, whether to print progress
+    :return: Dictionary with dataframes
+    """
     articles, customers, transactions = None, None, None
     if verbose:
         print("\nLoading articles", end='')
@@ -67,6 +66,12 @@ def load_data(read_articles=True, read_customers=True, read_transactions=True, f
 
 
 def test_train_split(samples, val_period=1):
+    """
+    Split samples into train and validation sets
+    :param samples: DataFrame, samples to split
+    :param val_period: Int, number of weeks to use for validation
+    :return: Tuple of DataFrames
+    """
     max_date = samples['t_dat'].max()
     max_train_date = max_date - pd.DateOffset(weeks=val_period)
     train = samples[samples['t_dat'] <= max_train_date]
@@ -78,6 +83,12 @@ def test_train_split(samples, val_period=1):
 
 
 def dict_to_df(d, to_string=True):
+    """
+    Convert dictionary to DataFrame
+    :param d: Dictionary
+    :param to_string: Boolean, whether to convert list to string (useful for submission)
+    :return:
+    """
     if to_string:
         for key in d:
             d[key] = ' '.join([f"0{x}" for x in d[key]])
@@ -87,6 +98,13 @@ def dict_to_df(d, to_string=True):
 
 
 def write_submission(results, append=False, verbose=True):
+    """
+    Write submission file
+    :param results: Dictionary or DataFrame with results
+    :param append: Boolean, whether to append to existing file
+    :param verbose: Boolean, whether to print progress
+    :return:
+    """
     if verbose:
         print("Writing submission", end='')
     if type(results) == dict:
@@ -112,6 +130,13 @@ def write_submission(results, append=False, verbose=True):
 
 
 def map_at_12(predictions: pd.DataFrame, ground_truth: pd.DataFrame, verbose=True):
+    """
+    Compute MAP@12 metric
+    :param predictions: DataFrame with predictions
+    :param ground_truth: DataFrame with ground truth
+    :param verbose: Boolean, whether to print progress
+    :return: Float, MAP@12 score
+    """
     predictions = predictions.set_index(['customer_id'])
     aps = []
     gt_dict = ground_truth.to_dict('records')
@@ -142,6 +167,14 @@ def map_at_12(predictions: pd.DataFrame, ground_truth: pd.DataFrame, verbose=Tru
 
 
 def candidates_recall_test(data, ground_truth: pd.DataFrame, count_missing=True, verbose=True):
+    """
+    Compute recall of candidates
+    :param data: DataFrame with candidates
+    :param ground_truth: DataFrame with ground truth
+    :param count_missing: Boolean, whether to count missing customers
+    :param verbose: Boolean, whether to print progress
+    :return: Float, recall score
+    """
     # get candidates
     samples = data['samples']
     test_week = data['test_week']
@@ -170,28 +203,44 @@ def candidates_recall_test(data, ground_truth: pd.DataFrame, count_missing=True,
 
 
 def merge_downcast(df1, df2, **kwargs):
+    """
+    Merge two DataFrames and downcast to the smallest possible type using pandas-downcast
+    :param df1: DataFrame
+    :param df2: DataFrame
+    :param kwargs: Keyword arguments for pd.merge
+    :return: Merged DataFrame
+    """
     df = pd.merge(df1, df2, **kwargs)
     try:
         dcdf = pdc.downcast(df)
         return dcdf
     except:
-        print(f"Downcasting failed")
+        warnings.warn(f"Downcasting failed")
         return df
 
 
 def concat_downcast(dfs, **kwargs):
-    # for df in dfs[1:]:
-    #     assert df.shape[0] > 0, "Empty dataframe"
+    """
+    Concatenate DataFrames and downcast to the smallest possible type using pandas-downcast
+    :param dfs: List of DataFrames
+    :param kwargs: Keyword arguments for pd.concat
+    :return: Concatenated DataFrame
+    """
     df = pd.concat(dfs, **kwargs)
     try:
         dcdf = pdc.downcast(df)
         return dcdf
     except:
-        print(f"Downcasting failed")
+        warnings.warn(f"Downcasting failed")
         return df
 
 
 def make_purchase_history(transactions):
+    """
+    Make purchase history from transactions
+    :param transactions: DataFrame with transactions
+    :return: DataFrame with purchase history
+    """
     m = transactions.drop_duplicates(['customer_id', 'article_id']).groupby(['customer_id', 'week'])[
         'article_id'].apply(list).reset_index(name='last_week')
     m = m.sort_values(['customer_id', 'week']).reset_index(drop=True)

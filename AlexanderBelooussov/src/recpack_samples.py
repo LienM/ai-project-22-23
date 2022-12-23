@@ -4,7 +4,6 @@ from recpack.pipelines import PipelineBuilder
 from recpack.preprocessing.filters import Deduplicate, MinUsersPerItem
 from recpack.preprocessing.preprocessors import DataFramePreprocessor
 from recpack.scenarios import StrongGeneralizationTimed
-from multiprocessing import Pool
 
 pd.options.display.max_columns = None
 pd.options.display.max_rows = None
@@ -24,35 +23,26 @@ from preprocessing import *
 #     return df
 
 
-def get_recpack_samples(transactions, n=12, algorithm='prod2vec', customers=None):
+def get_recpack_samples(transactions_train, n=12, algorithm='prod2vec', customers=None):
     """
     Get top n items based on a recpack algorithm, for each customer with a purchase history
-    :param transactions:
-    :param n:
-    :return:
+    For week after last week in transactions
+    :param transactions_train: DataFrame with transactions
+    :param n: number of items to recommend
+    :param algorithm: algorithm to use, ['itemknn', 'prod2vec']
+    :param customers: list of customers to recommend for
+    :return: DataFrame with samples
     """
     df_pp = DataFramePreprocessor(user_ix='customer_id', item_ix='article_id', timestamp_ix='week')
     df_pp.add_filter(
         Deduplicate("article_id", "customer_id", "week")
     )
     df_pp.add_filter(MinUsersPerItem(1, "article_id", "customer_id"))
-    interaction_matrix = df_pp.process(transactions)
-    if algorithm == 'itemknn':
-        algo = ItemKNN(K=100)
-        algo.fit(interaction_matrix)
-    elif algorithm == 'prod2vec':
-        scenario = StrongGeneralizationTimed(0.75, validation=True, t=transactions['week'].max() + 1,
-                                             t_validation=transactions['week'].max())
-        scenario.split(interaction_matrix)
-        algo = Prod2Vec()
-        algo.fit(scenario.full_training_data, (scenario.validation_data_in, scenario.validation_data_out))
-    else:
-        raise ValueError("Algorithm not supported")
-
-    predictions = algo.predict(interaction_matrix)
+    interaction_matrix = df_pp.process(transactions_train)
+    predictions = get_predictions(algorithm, interaction_matrix, transactions_train)
     valid_customers = customers
-    customers = transactions['customer_id'].unique()
-    articles = transactions['article_id'].unique()
+    customers = transactions_train['customer_id'].unique()
+    articles = transactions_train['article_id'].unique()
     # get top 12 predictions for each customer
     results = []
     for i, customer in enumerate(tqdm(customers, desc=f"Generating top {n} recpack samples", leave=False)):
@@ -68,21 +58,21 @@ def get_recpack_samples(transactions, n=12, algorithm='prod2vec', customers=None
     return result_df.reset_index(drop=True)
 
 
-def recpack_cv(data):
+def recpack_cv(data_dict):
     """
     Function to compare some algorithms in recpack
-    :param data:
+    :param data_dict: dictionary with data
     :return:
     """
-    transactions = data['transactions']
+    transactions_train = data_dict['transactions']
     df_pp = DataFramePreprocessor(user_ix='customer_id', item_ix='article_id', timestamp_ix='week')
     df_pp.add_filter(
         Deduplicate("article_id", "customer_id", "week")
     )
     df_pp.add_filter(MinUsersPerItem(1, "article_id", "customer_id"))
-    interaction_matrix = df_pp.process(transactions)
-    scenario = StrongGeneralizationTimed(0.75, validation=True, t=data['transactions']['week'].max(),
-                                         t_validation=data['transactions']['week'].max() - 4)
+    interaction_matrix = df_pp.process(transactions_train)
+    scenario = StrongGeneralizationTimed(0.75, validation=True, t=data_dict['transactions']['week'].max(),
+                                         t_validation=data_dict['transactions']['week'].max() - 4)
     scenario.split(interaction_matrix)
     builder = PipelineBuilder()
     builder.set_data_from_scenario(scenario)
@@ -103,7 +93,14 @@ def recpack_cv(data):
     print(pd.DataFrame.from_dict(pipeline.get_metrics()))
 
 
-def add_recpack_score(samples, transactions, algorithm='prod2vec'):
+def add_recpack_score(samples, transactions_train, algorithm='prod2vec'):
+    """
+    Add recpack score to samples, after all samples have been generated
+    :param samples: DataFrame with samples
+    :param transactions_train: DataFrame with transactions
+    :param algorithm: algorithm to use, ['itemknn', 'prod2vec']
+    :return: DataFrame with samples and scores
+    """
     df_pp = DataFramePreprocessor(user_ix='customer_id', item_ix='article_id', timestamp_ix='week')
     df_pp.add_filter(
         Deduplicate("article_id", "customer_id", "week")
@@ -111,23 +108,11 @@ def add_recpack_score(samples, transactions, algorithm='prod2vec'):
     df_pp.add_filter(MinUsersPerItem(1, "article_id", "customer_id"))
     scores = pd.DataFrame()
     for w in tqdm(samples.week.unique(), desc="Adding recpack scores", leave=False):
-        transactions_w = transactions[transactions.week < w]
+        transactions_w = transactions_train[transactions_train.week < w]
         customer_map = {c: i for i, c in enumerate(transactions_w.customer_id.unique())}
         article_map = {a: i for i, a in enumerate(transactions_w.article_id.unique())}
         interaction_matrix = df_pp.process(transactions_w)
-        if algorithm == 'itemknn':
-            algo = ItemKNN(K=100)
-            algo.fit(interaction_matrix)
-        elif algorithm == 'prod2vec':
-            scenario = StrongGeneralizationTimed(0.75, validation=True, t=transactions['week'].max() + 1,
-                                                 t_validation=transactions['week'].max())
-            scenario.split(interaction_matrix)
-            algo = Prod2Vec()
-            algo.fit(scenario.full_training_data, (scenario.validation_data_in, scenario.validation_data_out))
-        else:
-            raise ValueError("Algorithm not supported")
-
-        predictions = algo.predict(interaction_matrix)
+        predictions = get_predictions(algorithm, interaction_matrix, transactions_train)
         scores_w = samples[samples.week == w][['customer_id', 'article_id', 'week']]
         scores_w[f'{algorithm}_score'] = scores_w. \
             progress_apply(
@@ -137,6 +122,93 @@ def add_recpack_score(samples, transactions, algorithm='prod2vec'):
         scores = pd.concat([scores, scores_w])
     samples = merge_downcast(samples, scores, on=['customer_id', 'article_id', 'week'], how='left')
     return samples
+
+
+def get_predictions(algorithm, interaction_matrix, transactions_train):
+    """
+    Get predictions for a given algorithm
+    :param algorithm: algorithm to use, ['itemknn', 'prod2vec']
+    :param interaction_matrix: interaction matrix generated by Recpack
+    :param transactions_train: DataFrame with transactions
+    :return: Matrix with predictions
+    """
+    if algorithm == 'itemknn':
+        algo = ItemKNN(K=100)
+        algo.fit(interaction_matrix)
+    elif algorithm == 'prod2vec':
+        scenario = StrongGeneralizationTimed(0.75, validation=True, t=transactions_train['week'].max() + 1,
+                                             t_validation=transactions_train['week'].max())
+        scenario.split(interaction_matrix)
+        algo = Prod2Vec()
+        algo.fit(scenario.full_training_data, (scenario.validation_data_in, scenario.validation_data_out))
+    else:
+        raise ValueError("Algorithm not supported")
+    predictions = algo.predict(interaction_matrix)
+    return predictions
+
+
+def generate_recpack_samples(n, n_train_weeks, previous_week_info, recpack_candidates, recpack_methods, scale_n,
+                             test_set_transactions, transactions_train, unique_transactions, verbose, only_candidates):
+    """
+    Generate samples using recpack
+    For all n_train_weeks and test week
+    :param n: Int, number of samples to generate
+    :param n_train_weeks: Int, number of weeks to use for training
+    :param previous_week_info: DataFrame with previous week info
+    :param recpack_candidates: DataFrame with recpack candidates
+    :param recpack_methods: List with recpack methods
+    :param scale_n: Bool, whether to scale up n as the week gets closer to the test week
+    :param test_set_transactions: DataFrame, customers for test week
+    :param transactions_train: DataFrame with transactions
+    :param unique_transactions: DataFrame, unique customer interactions (per week)
+    :param verbose: Bool, whether to print progress
+    :param only_candidates: Bool, whether to only generate candidates
+    :return: DataFrame with samples
+    """
+    for method in recpack_methods:
+        if verbose:
+            print(f"Generating samples with RecPack: {method}")
+        # some initial recpack candidates
+        start = transactions_train.week.max() - n_train_weeks + 1 if not only_candidates \
+            else transactions_train.week.max() + 1
+        for w in tqdm(range(start, transactions_train.week.max() + 2),
+                      desc=f"Recpack samples per week"):
+            transactions_w = transactions_train[transactions_train.week < w]
+            if scale_n:
+                i = int((w - transactions_train.week.min()) / (
+                        transactions_train.week.max() + 1 - transactions_train.week.min()) * n)
+                i = max(1, i)
+            else:
+                i = n
+            if w < transactions_train.week.max() + 1:
+                customers_to_use = unique_transactions[unique_transactions.week == w]
+                customers_to_use = customers_to_use[customers_to_use.customer_id.isin(transactions_w.customer_id)]
+            else:
+                customers_to_use = test_set_transactions
+
+            recpack = get_recpack_samples(transactions_w, i, algorithm=method,
+                                          customers=customers_to_use.customer_id.unique())
+            recpack['week'] = w
+            recpack_samples = pd.merge(
+                customers_to_use,
+                recpack,
+                on=['week', 'customer_id']
+            )
+            if w < transactions_train.week.max() + 1:
+                assert recpack_samples.shape[0] == customers_to_use.shape[0] * i, \
+                    f"Expected {customers_to_use.shape[0]} * {i} = {customers_to_use.shape[0] * i} samples, " \
+                    f"got {recpack_samples.shape[0]}"
+            else:
+                assert recpack_samples.shape[0] == customers_to_use.shape[0] * i, \
+                    f"{recpack_samples.shape[0]} != {customers_to_use.shape[0]} * {i}"
+            recpack_candidates = concat_downcast([recpack_candidates, recpack_samples])
+            recpack_candidates.drop_duplicates(['week', 'customer_id', 'article_id'], inplace=True)
+    # add price
+    if len(recpack_methods):
+        recpack_candidates = merge_downcast(recpack_candidates, previous_week_info[['week', 'article_id', 'price']],
+                                            on=['week', 'article_id'], how='left')
+        recpack_candidates.drop_duplicates(['week', 'customer_id', 'article_id'], inplace=True)
+    return recpack_candidates
 
 
 if __name__ == '__main__':

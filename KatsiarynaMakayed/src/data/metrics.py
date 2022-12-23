@@ -2,6 +2,7 @@ from typing import Iterable
 import numpy as np
 
 
+# https://www.kaggle.com/code/debarshichanda/understanding-mean-average-precision/notebook
 def _ap_at_k(actual, predicted, k=10):
     if len(predicted) > k:
         predicted = predicted[:k]
@@ -69,6 +70,35 @@ def recall_at_k(actual: Iterable, predicted: Iterable, k: int = 12) -> float:
         recall@k.
     """
     return np.mean([_rk(a, p, k) for a, p in zip(actual, predicted)])
+
+
+def precision_at_k(actual: Iterable, predicted: Iterable, k: int = 12) -> float:
+    """Compute precision@k.
+
+    Parameters
+    ----------
+    actual : Iterable
+        Label.
+    predicted : Iterable
+        Predictions.
+    k : int, optional
+        k, by default ``12``.
+
+    Returns
+    -------
+    float
+        precision@k.
+    """
+    return np.mean([_pk(a, p, k) for a, p in zip(actual, predicted)])
+
+def _pk(actual, predicted, k=10):
+    if len(predicted) > k:
+        predicted = predicted[:k]
+
+    score = sum([1 for r in actual if r in predicted]) / len(predicted)
+
+    return score
+
 
 
 def hr_at_k(actual: Iterable, predicted: Iterable, k: int = 10) -> float:

@@ -1,0 +1,25 @@
+features,candidates,public score
+baseline,no candidates,0.02114
+garment_group_no,no candidates,0.02142
+garment_group_no,candidates,0.0214
+product_type_no,no candidates,0.02161
+product_type_no,candidates,0.02145
+index_group_no,no candidates,0.02133
+index_group_no,candidates,0.02155
+graphical_appearance,no candidates,0.0214
+graphical_appearance,candidates,0.02142
+perceived_colour_value,no candidates,0.02139
+perceived_colour_value,candidates,0.02149
+group of 3,no candidates,0.02152
+group of 3,candidates,0.0214
+group of 3 + combine,no candidates,0.02146
+group of 3 + combine,candidates,0.0214
+4 with type,no candidates,0.02141
+4 with type,candidates,0.02157
+4 with type + combine,no candidates,0.02151
+4 with type + combine,candidates,0.0214
+4 with garm,no candidates,0.02152
+4 with garm,candidates,0.02153
+4 with garm + combine,no candidates,0.02151
+4 with garm + combine,candidates,0.0214
+

@@ -14,6 +14,8 @@ going to buy
     * [Graph embeddings](#graph-embeddings)
     * [Age bin popularity](#age-bin-popularity)
 * [Exploration](#exploration)
+* [Other files](#other-files)
+* [Tests](#tests)
 
 ## General info
 
@@ -171,6 +173,7 @@ is the code used to generate the plots used in the presentation.
 All other files are helping to clean up and do other stuff.
 
 ## Tests
+
 The tests done in order to check if everything was in order during the project
 was mainly done via scratch files (so removed once used). Furthermore, the code
 should be clear enough to make it easy to understand what is going on, no weird

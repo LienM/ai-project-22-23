@@ -85,10 +85,10 @@ python3 BasilRommens/graph_embedding/embed.py
 python3 BasilRommens/graph_embedding/candidates.py
 ```
 
-TODO
 to run the age bin popularity research question results:
 
 ```bash
+python3 BasilRommens/notebook/submission.py
 ```
 
 ## Dataset
@@ -160,8 +160,8 @@ located in the `helper` directory. There are also code snippets in the
 the data. `notebook.py` contains general code that could be used by any of the
 notebook data. All things concerning generating popularity metrics can be 
 mainly found in `popularity.py`. As for the submission, they can be found in the
-appropriately named `submission.py` file. The `predictions.py` file contains the
-code to make the predictions.
+appropriately named `submission.py` file, which is the main file to run. The 
+`predictions.py` file contains the code to make the predictions.
 
 ## Exploration
 

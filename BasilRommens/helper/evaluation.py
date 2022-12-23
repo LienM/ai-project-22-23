@@ -317,3 +317,39 @@ if __name__ == "__main__":
     cv_dict = cv(transactions, last_weeks, n_weeks, type_name, second_it_name,
                  suffix)
     show_cv(cv_dict)
+
+
+def compare_rankings(ranking_1, ranking_2):
+    """
+    comparing 2 rankings with the values being the ids to compare expressed in
+    ranking. The similarity will be expressed by the sum of the difference of
+    item rankings of the second compared to the first. If the item of the second
+    ranking isn't present in the first one it will be the length of the maximal
+    length of both rankings times 2. Thus, a lower similarity score is a better
+    one. This is not normalized.
+    :param ranking_1: first ranking
+    :param ranking_2: second ranking
+    :return: similarity between the 2 rankings
+    """
+    # the similarity score
+    sim = 0
+
+    # iterate over all the items and determine
+    for key_2, rank_idx_2 in ranking_2:
+        added = False
+
+        # iterate over all the first ranking items to determine
+        for key_1, rank_idx_1 in ranking_1:
+            # add idx difference if both keys are the same
+            if key_1 == key_2:
+                sim += abs(rank_idx_1 - rank_idx_2)
+                added = True
+                break
+
+        # if the item is not present in the first ranking then add the max of
+        # lengths of both rankings, this is a very strong penalization of not
+        # being in the rank
+        if not added:
+            sim += max(len(ranking_1), len(ranking_2)) * 2
+
+    return sim

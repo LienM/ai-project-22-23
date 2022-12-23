@@ -1,19 +1,14 @@
-import joblib
-import scipy.spatial as scs
-from sklearn.decomposition import PCA
-from umap import UMAP
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+import scipy.spatial as scs
 import seaborn as sns
-from scipy.stats import rankdata
 
-from BasilRommens.helper.dataset import part_data_set, read_data_set
-from BasilRommens.notebook import get_relevant_cols, merge_transactions, \
-    change_age
+from BasilRommens.helper.dataset import read_data_set, impute_age, \
+    get_relevant_cols
+from BasilRommens.notebook.notebook import merge_transactions
 
 
-def show_item_count_per_age_bin():
+def show_article_count_per_age_bin():
     """
     We use this function to show the distribution of product type no counts per
     age
@@ -256,7 +251,7 @@ def explore_age_impute():
 
     # impute all the -1 ages with the most similar age based on correlation of
     # number of product types bought
-    transactions = change_age(transactions)
+    transactions = impute_age(transactions)
     ages = transactions['age'].tolist()
     sns.histplot(ages, binwidth=1)
     plt.show()
@@ -296,7 +291,7 @@ def same_day_purchase():
 
 
 if __name__ == '__main__':
-    show_item_count_per_age_bin()
+    show_article_count_per_age_bin()
     explore_rq1()
     explore_age_impute()
     same_day_purchase()

@@ -142,18 +142,39 @@ of the graph. We used 3 different algorithms to create graphs. They are further
 specified in the file `embed.py`. We also used set up 5 different experiments to
 generate suitable candidates for recommending items for customers. They are
 listed at the bottom. As we use embeddings, we also want tot find the k nearest
-as fast as possible and therefore we use indexing to do this, through the use
+as fast as possible, and therefore we use indexing to do this, through the use
 of annoy. The embeddings are generated in `embed.py` and the indexing is done in
 `index.py`. The code to generate the candidates is in `candidates.py`.
 
 ### Age bin popularity
 All the files used for age bin popularity can be found in the `notebook` folder.
 
+We used the notebook from radekosmulski to generate the candidates and train
+for generating candidates. We based our code heavily on his code, but made 
+slight changes and chunked it into different functions, scattered over the files
+located in the `helper` directory. There are also code snippets in the 
+`notebook` folder. Most code that is using the notebook base is located in the 
+`notebook` folder. `age_bin.py` contains the code related to the age binning of
+the data. `notebook.py` contains general code that could be used by any of the
+notebook data. All things concerning generating popularity metrics can be 
+mainly found in `popularity.py`. As for the submission, they can be found in the
+appropriately named `submission.py` file. The `predictions.py` file contains the
+code to make the predictions.
+
 ## Exploration
 
-This is a less important part of the project, but here is some of the code used
-to generate the plots used in the presentation.
+This is a less important part of the project, but in the helper/exploration.py 
+is the code used to generate the plots used in the presentation.
 
 ## Other files
 
-all other files are helping to clean up and do other stuff.
+All other files are helping to clean up and do other stuff.
+
+## Tests
+The tests done in order to check if everything was in order during the project
+was mainly done via scratch files (so removed once used). Furthermore, the code
+should be clear enough to make it easy to understand what is going on, no weird
+stuff should happen. Tests regarding the submission were done through the kaggle
+platform to check if we got the proper results. Data exploration was also done
+to check if there were some weird inconsistencies, the corresponding file can be
+found in `helper/exploration.py`.

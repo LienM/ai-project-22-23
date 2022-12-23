@@ -222,7 +222,7 @@ def graph_submission_walk_len():
 if __name__ == '__main__':
     # these are the submissions for the graph embeddings that can be uploaded if
     # the week is 106
-    # graph_submission_original()
+    graph_submission_original()
 
     graph_submission_walk_nr()
     graph_submission_walk_len()

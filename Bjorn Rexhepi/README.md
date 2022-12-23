@@ -13,16 +13,16 @@ Below, it will be shown the description of the final work notebooks:
 - `Algorithms_Validation_TimedLastItemPrediction_Scenario.ipynb`: Notebook that contains the validation of the models used for this
   project with `TimedLastItemPrediction` scenario.
 - `Algorithms_Validation_Timed_Scenario.ipynb`: Notebook that contains the validation of the models used for this project with `Timed` scenario.
-- `AR.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running AR algorithm.
+- `AR.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running `AR` algorithm.
 - `AR_EX.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running the extension
-   of the `k` last recent items prediction version of AR algorithm.
+   of the `k` last recent items prediction version of `AR` algorithm.
 - `AR_Last_Item.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running the extension
-   of the last item prediction version of AR algorithm.
-- `SR.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running AR algorithm.
+   of the last item prediction version of `AR` algorithm.
+- `SR.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running `SR` algorithm.
 - `SR_EX.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running the extension
-   of the `k` last recent items prediction version of SR algorithm.
+   of the `k` last recent items prediction version of `SR` algorithm.
 - `SR_Last_Item.ipynb`: Notebook that contain the submission work to generate the best possible candidates for Kaggle submission, by running the extension
-   of the last item prediction version of SR algorithm.
+   of the last item prediction version of `SR` algorithm.
 
 ## Notations
 - `AR` = Association Rule

@@ -89,6 +89,7 @@ def eda_material_season_product_type_name(transactions, articles):
 
     plt.show()
 
+
 def eda_price(transactions, articles):
     prices = transactions[["article_id", "price"]].groupby(["article_id"]).min("price")
     prices["price"] = -np.log(prices["price"])
@@ -107,17 +108,66 @@ def eda_price(transactions, articles):
     print(prices.info)
 
 
+def bucket_ages(customers, start=16 , stop=60, bucket_size=10):
+    """
+    Convert the ages to buckets to provide generalization
+    """
+    customers['age_cat'] = None
+    current = start
+    while current <= stop:
+        label = f'{current}-{current+10}'
+        condition = (customers['age'] >= current) & (customers['age'] < current+10)
+        customers.loc[condition, 'age_cat'] = label
+        current += 10
+    condition = customers['age'] >= 66
+    customers.loc[condition, 'age_cat'] = '66+'
+
+    return customers
+
+
+def combine_features(df, feature_1, feature_2):
+    """
+    Basic feature combining function
+    : df: the dataframe containing the features
+    : feature_1: the column name of the first feature
+    : feature_2: the column name of the second feature
+    """
+    df[f"{feature_1}_{feature_2}"] = (df[feature_1].astype(str) + '_' + df[feature_2].astype(str))
+    return df
+
+
+def eda_age_postal_relation(customers, articles):
+    customers['age'] = customers['age'].fillna(20)
+    customers = bucket_ages(customers)
+    from sklearn.preprocessing import LabelEncoder
+    encoder = LabelEncoder()
+    customers['postal_code'] = encoder.fit_transform(customers['postal_code'])
+    customers = combine_features(customers, 'age_cat', 'postal_code')
+    customers.rename(columns={'age_cat_postal_code': 'postal_age'}, inplace=True)
+
+    ages = customers['age_cat'].value_counts().rename_axis("age_cat").reset_index(name="count")
+    ax = sns.barplot(ages, x="age_cat", y="count")
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right")
+    plt.tight_layout()
+    plt.show()
+    print(customers['postal_code'].info())
+
 
 
 if __name__ == "__main__":
 
+    articles = pd.read_csv('../data/articles_sample5.csv.gz')
+    customers = pd.read_csv('../data/customers_sample5.csv.gz')
+    # transactions = pd.read_csv('../data/transactions_sample5.csv.gz')
 
-    transactions, articles, customers, samples = None, None, None, None
+    eda_age_postal_relation(customers, articles)
+
+    # transactions, articles, customers, samples = None, None, None, None
     # load dataset
-    if PARAM["PP"]:
-        transactions, articles, customers, samples = preprocess_data()
-    else:
-        transactions, articles, customers, samples = load_pkl()
+    # if PARAM["PP"]:
+    #     transactions, articles, customers, samples = preprocess_data()
+    # else:
+    #     transactions, articles, customers, samples = load_pkl()
 
     # eda_materials(articles)
     # eda_material_product_type(transactions,articles)
@@ -125,5 +175,5 @@ if __name__ == "__main__":
     # eda_material_season_product_type_name(transactions, articles)
     # eda_repurchase(transactions)
     # eda_colour_season(transactions, articles)
-    eda_price(transactions, articles)
+    # eda_price(transactions, articles)
     # clean()

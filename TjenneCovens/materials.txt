@@ -2,13 +2,17 @@ nylon
 russell cord
 denim
 zibeline
-alpaca
 ottoman
-carbon fibers
-sanforization
 olefin
 gannex
 hessian
+viscose
+pile
+tencel
+woven fabric
+lyocell
+fleece
+chenille
 faux fur
 pashmina
 osnaburg
@@ -22,71 +26,53 @@ tricot
 loden
 cordura
 burlap
-e. thomas
 gazar
-kente cloth
 mackinaw
 gingham
 velours du kasaï
-boiled wool
 serge
 sateen
 rayon
 rakematiz
 larusmiani
 toile
-grenfell cloth
 oilskin
 shweshwe
 khādī
-beta cloth
 georgette
 drugget
 corduroy
 carlo barbera
-carrickmacross lace
 dormeuil
 jamdani
 kasuri
-finishing
-limerick lace
-sea silk
-punto in aria lace
 felt
 tartan
 whipcord
 capilene
 chenille
-c change
 hennep
-vitale barberis canonico
 grosgrain
 burnout
 jersey
 jeans
 oxford
-worsted wool
-microfiber
 lampas
 madras
-teneriffe lace
 devoré
 neoprene
 sympatex
 voile
 sharkskin
-polar fleece
 twill
 dyeing
 lamé
-point de gaze lace
 bombazine
 songket
 moleskin
 habutai
 viyella
 bunting
-grenadine
 mousseline
 paisley
 yūzen
@@ -98,21 +84,15 @@ ghalamkar
 organdy
 batik
 decatising
-fashion portal
 chintz
 plush
 mockado
 silnylon
 milliskin
-weaving
 samite
-lawn cloth
 brilliantine
 longcloth
-chantilly lace
-conductive textile
 nainsook
-waxed cotton
 velveteen
 fibres
 angora
@@ -120,53 +100,39 @@ flannel
 cerruti
 batiste
 bengaline
-cloth of gold
 nap
 calico
 tucuyo
-burano lace
-battenberg lace
-harris tweed
 poplin
 rinzu
-interlock jersey
 pleated linen
 fustian
-parchmentising
-knitted
 elastic
 leatherette
-barkcloth
 matelassé
 lace
 crêpe
-armenian needlelace
-warp printing
 challis
 scrim
 tenterhook
 gore-tex
+sweatshirt fabric
 coutil
 damask
 buckram
 zorbeez
-duck
 dornix
-ballistic nylon
+microfibre
+plastic
 seersucker
-spider silk
-broderie anglaise
-knitting
 terry velour
 rōketsuzome
 bògòlanfini
 herringbone
-bafta cloth
 baize
 chiffon
 wool
 katazome
-youghal lace
 paduasoy
 cashmere
 cotton
@@ -175,7 +141,6 @@ coolmax
 hemp
 dimity
 canvas
-cheesecloth
 bobbinet
 muslin
 zephyr
@@ -186,16 +151,12 @@ lantana
 wigan
 acrylic
 calendering
-halas lace
 madapollam
 drill
-cotton duck
-fiber
 terrycloth
 silk
 belted
 satin
-mohair
 fishnet
 panné velvet
 aertex
@@ -203,12 +164,9 @@ netted
 brocade
 khaki drill
 surah
-needlerun net
 suede
-gauze
 percale
 antique satin
-linsey-woolsey
 crepe
 reda
 linen
@@ -216,26 +174,17 @@ stockinette
 melton
 kelsch
 velvet
-side
-synthetic fabric
-lenticular fabric
-bengaline silk
-char cloth
 ventile
 eisengarn
 eolienne
-argentan lace
 recycling
 saga nishiki
-buratto lace
 spandex
 tweed
 nankeen
-shot silk
 manufacturing
 charvet
-roller printing
-swanskin cloth
+metal
 intarsia
 cloqué
 peau de soie
@@ -250,63 +199,46 @@ bouclé
 ultrasuede
 loro piana
 jute
-almerían silk
-double cloth
 moquette
-bizarre silk
 argyle
 tattersall
 chiengora
 ban-lon
 irish linen
 leather
-tambour lace
 shrinkage
 houndstooth
-jacquard knit
 sisal
+cloth
 dyneema
-cedar bark textile
 lanon
 tapestry
-woven
 indienne
+zinc
+sweatshirt fabric
 tulle netting
 tsutsugaki
 terminology
 nonwoven
 plissé
 piqué
-fabric
-hollie point lace
-houndstooth check
 sailcloth
 darlexx
 dobby
 zegna
 tulle
-donegal tweed
 stub-tex
 cretonne
-woodblock printing
 charmeuse
-vinyl coated polyester
 beetling
 tais
 moire
 sendal
-alençon lace
 dungarees
-cedar bark
 chino
-camel's hair
-holland cloth
-monk's cloth
 piña
 barathea
 himroo
-history of textiles
-waffle
 fulling
 taffeta
 kevlar
@@ -316,49 +248,31 @@ coir
 pandy
 rep
 mesh
-filet/lacis lace
-ticking
 mouflon
 bedford cord
 pinstripes
 crimplene
-crash (fabric)
 bingata
 heatsetting
-net
 ramie
-design
-reticella lace
-seerhand muslin
 lawn
 himro
 yarn
 camlet
-venetian lace
-point de venise lace
 scarlet
-rogan printing
 armazine
-holland & sherry
-point de france lace
 chiné
-vegetable flannel
 shantung
 crêpe de chine
 rib knit
+jacquard knit
+fluffy knit
+soft knit
+fine knit
 drago
 dotted swiss
-byrd cloth
 polka dot
-performance
-mercerization
-argentella lace
-dupioni silk
-windstopper
-pile woven
-faux leather
 darlex
-acetate
 burlap
 tyocell
 modal
